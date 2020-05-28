@@ -1,4 +1,4 @@
-package client
+package consumer
 
 import (
 	"context"
@@ -8,9 +8,10 @@ import (
 	"github.com/albertwidi/gonsq"
 )
 
-// ConsumerGroup is not like consumer group in Kafka. The consumer group is only a group of
-// consumer that have same topic.
-type ConsumerGroup struct {
+// Group is a group of topic and channels that wrapped together using gonsq.
+// This is not like consumer group in Kafka, the consumer group is only a group of
+// consumer that have the same topic.
+type Group struct {
 	Topic       string
 	Channels    []Channel
 	Lookupd     gonsq.LookupdConfig
@@ -36,10 +37,10 @@ func (c *Channel) validate() error {
 	return nil
 }
 
-// NewConsumerGroup to create a new consumer group using gonsq.WrapConsumers. This consumer group is not like Kafka consumer group,
+// NewGroup for creating a new consumer group using gonsq.WrapConsumers. This consumer group is not like Kafka consumer group,
 // this consumer group is only grouping consumers with same topic. A consumer with different topic will grouped into another
 // wrapper in gonsq.Consumer.
-func NewConsumerGroup(ctx context.Context, lookupdAddresses []string, groups []ConsumerGroup) (*gonsq.Consumer, error) {
+func NewGroup(ctx context.Context, lookupdAddresses []string, groups []Group) (*gonsq.Consumer, error) {
 	wc, err := gonsq.WrapConsumers(lookupdAddresses)
 	if err != nil {
 		return nil, err
@@ -75,5 +76,5 @@ func NewConsumerGroup(ctx context.Context, lookupdAddresses []string, groups []C
 			}
 		}
 	}
-	return nil, err
+	return wc, err
 }

@@ -2,8 +2,8 @@ version: '3'
 services:
     nsq_consumer:
         build:
-            context: ./consumer
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: Dockerfile.consumer
         ports:
         - "9000:9000"
         command:
@@ -11,16 +11,20 @@ services:
             --nsq.topic=random \
             --nsq.lookupd-address=nsqlookupd:4161 \
             --nsq.concurrency=2
+        depends_on: 
+        - nsqlookupd
     
     nsq_producer:
         build:
-            context: ./producer
-            dockerfile: Dockerfile
+            context: .
+            dockerfile: Dockerfile.producer
         ports:
         - "9001:9001"
         command:
         - --nsq.topic=random \
             --nsq.nsqd-address=nsqd:4151
+        depends_on: 
+        - nsqlookupd
 
     prometheus:
         image: prom/prometheus:latest

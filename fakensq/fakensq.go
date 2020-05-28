@@ -40,7 +40,7 @@ func (fnsq *FakeNSQ) NewConsumer(config ConsumerConfig) *Consumer {
 	consumer := &Consumer{
 		config:      config,
 		messageChan: messageChan,
-		stopChan:    make(chan struct{}),
+		stopC:       make(chan struct{}),
 	}
 	return consumer
 }
@@ -140,7 +140,7 @@ type Consumer struct {
 	config      ConsumerConfig
 	handlers    []nsqHandler
 	messageChan chan *nsqio.Message
-	stopChan    chan struct{}
+	stopC       chan struct{}
 
 	mu      sync.Mutex
 	started bool
@@ -170,7 +170,7 @@ func (cons *Consumer) addHandlers(handler nsqio.Handler, concurrency int) {
 	h := nsqHandler{
 		concurrency: concurrency,
 		messageChan: cons.messageChan,
-		stopChan:    cons.stopChan,
+		stopC:       cons.stopC,
 		handler:     handler,
 	}
 	cons.handlers = append(cons.handlers, h)
@@ -220,7 +220,7 @@ func (cons *Consumer) start() {
 			go func(h nsqHandler) {
 				for {
 					select {
-					case <-h.stopChan:
+					case <-h.stopC:
 						return
 					case msg := <-cons.messageChan:
 						h.handler.HandleMessage(msg)
@@ -255,11 +255,11 @@ type nsqHandler struct {
 	concurrency int
 	messageChan chan *nsqio.Message
 	handler     nsqio.Handler
-	stopChan    chan struct{}
+	stopC       chan struct{}
 }
 
 func (h *nsqHandler) Stop() {
-	h.stopChan <- struct{}{}
+	close(h.stopC)
 	return
 }
 

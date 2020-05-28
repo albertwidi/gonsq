@@ -1,8 +1,14 @@
-# NSQ
+# Gonsq
 
-Wrapper of nsqio library
+Wrapper of [go-nsq](https://github.com/nsqio/go-nsq) library
 
-Please note that this library only wrapped the existing consumers from `nsq/nsqio` backend and mapped them. The `nsq.Handler` also overrided with `HandlerFunc` in this library.
+The library inspired by how [Lyft Building an Adaptive, Multi-Tenant Stream Bus with Kafka and Golang] and [Flow Control architecture in envoy proxy](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md).
+
+## Nsqio
+
+Gonsq is not using standard `nsq.Consumer` and `nsq.Producer`, instead the library is providing `NSQConsumer` and `NSQProducer` object to communicate directly with `nsq.Consumer` and `nsq.Producer`.
+
+Some properties also added to the `NSQConsumer` object, for example `concurrency`. The `concurrency` information is used to inform the `Gonsq` about how many concurrent consumers that a given `NSQConsumer` want to run.
 
 ## Design
 

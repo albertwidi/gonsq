@@ -1,4 +1,4 @@
-package prometheus_middleware
+package prometheus
 
 import (
 	"errors"

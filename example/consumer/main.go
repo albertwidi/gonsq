@@ -14,9 +14,9 @@ import (
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 
 	"github.com/albertwidi/gonsq"
-	"github.com/albertwidi/gonsq/client"
+	"github.com/albertwidi/gonsq/consumer"
 	random_message "github.com/albertwidi/gonsq/example/message"
-	prommw "github.com/albertwidi/gonsq/prometheus-middleware"
+	prommw "github.com/albertwidi/gonsq/middlewares/prometheus"
 )
 
 type Flags struct {
@@ -34,10 +34,10 @@ func main() {
 	flag.IntVar(&f.Concurrency, "nsq.concurrency", 1, "concurrency number to consume message from nsq")
 	flag.Parse()
 
-	c, err := client.NewConsumerGroup(context.Background(), []string{f.NSQLookupdAddress}, []client.ConsumerGroup{
+	c, err := consumer.NewGroup(context.Background(), []string{f.NSQLookupdAddress}, []consumer.Group{
 		{
 			Topic: f.Topic,
-			Channels: []client.Channel{
+			Channels: []consumer.Channel{
 				{
 					Name: "random1",
 				},
@@ -68,9 +68,9 @@ func main() {
 	// metrics is always the first middleware.
 	c.Use(prommw.Metrics, throttle.Throttle)
 
-	c.Handle(f.Topic, "random1", consumer)
-	c.Handle(f.Topic, "random2", consumer)
-	c.Handle(f.Topic, "random3", consumer)
+	c.Handle(f.Topic, "random1", handler)
+	c.Handle(f.Topic, "random2", handler)
+	c.Handle(f.Topic, "random3", handler)
 
 	if err := c.Start(); err != nil {
 		panic(err)
@@ -100,7 +100,7 @@ func main() {
 	fmt.Println("exiting consumer")
 }
 
-func consumer(ctx context.Context, message *gonsq.Message) error {
+func handler(ctx context.Context, message *gonsq.Message) error {
 	rm := random_message.Random{}
 	if err := proto.Unmarshal(message.Body, &rm); err != nil {
 		return err

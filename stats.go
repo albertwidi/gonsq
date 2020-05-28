@@ -64,9 +64,9 @@ type Stats struct {
 	// Throttle is the status of throttle, true means throttle is on.
 	throttle Throttleb
 	// Concurrency is the number of concurrency intended for the consumer.
-	concurrency      int
-	bufferMultiplier int
-	mu               sync.Mutex
+	concurrency int
+	maxInFlight int
+	mu          sync.Mutex
 }
 
 func (s *Stats) addMessageCount(count uint64) uint64 {
@@ -97,13 +97,13 @@ func (s *Stats) Concurrency() int {
 	return s.concurrency
 }
 
-func (s *Stats) setBufferMultiplier(n int) {
-	s.bufferMultiplier = n
+func (s *Stats) setMaxInFlight(n int) {
+	s.maxInFlight = n
 }
 
-// BufferMultiplier return the length of the multiplier factor used to calculate buffer length
-func (s *Stats) BufferMultiplier() int {
-	return s.bufferMultiplier
+// MaxInFlight return the number of maxInFlight used to calculate buffer length
+func (s *Stats) MaxInFlight() int {
+	return s.maxInFlight
 }
 
 func (s *Stats) setBufferLength(n int) {

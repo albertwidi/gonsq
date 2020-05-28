@@ -23,19 +23,19 @@ func TestConcurrencyConfig(t *testing.T) {
 		{
 			"zero concurrency and buffer multiplier",
 			ConcurrencyConfig{0, 0},
-			ConcurrencyConfig{Concurrency: defaultConcurrency, BufferMultiplier: defaultBufferMultiplier},
+			ConcurrencyConfig{defaultConcurrency, defaultMaxInFlight},
 			nil,
 		},
 		{
 			"negative concurrency and buffer multiplier",
 			ConcurrencyConfig{-1, -1},
-			ConcurrencyConfig{defaultConcurrency, defaultBufferMultiplier},
+			ConcurrencyConfig{defaultConcurrency, defaultMaxInFlight},
 			nil,
 		},
 		{
 			"negative buffer multiplier",
 			ConcurrencyConfig{10, -1},
-			ConcurrencyConfig{10, defaultBufferMultiplier},
+			ConcurrencyConfig{10, defaultMaxInFlight},
 			nil,
 		},
 		{
@@ -76,8 +76,8 @@ func TestNewNSQConsumer(t *testing.T) {
 				Topic:   "test1",
 				Channel: "test1",
 				Concurrency: ConcurrencyConfig{
-					Concurrency:      1,
-					BufferMultiplier: 50,
+					Concurrency: 1,
+					MaxInFlight: 50,
 				},
 			},
 			nil,
@@ -87,8 +87,8 @@ func TestNewNSQConsumer(t *testing.T) {
 			NSQConsumerConfig{
 				Channel: "test1",
 				Concurrency: ConcurrencyConfig{
-					Concurrency:      1,
-					BufferMultiplier: 50,
+					Concurrency: 1,
+					MaxInFlight: 50,
 				},
 			},
 			errTopicEmpty,
@@ -98,8 +98,8 @@ func TestNewNSQConsumer(t *testing.T) {
 			NSQConsumerConfig{
 				Topic: "test1",
 				Concurrency: ConcurrencyConfig{
-					Concurrency:      1,
-					BufferMultiplier: 50,
+					Concurrency: 1,
+					MaxInFlight: 50,
 				},
 			},
 			errChannelEmpty,

@@ -13,9 +13,6 @@ var (
 	ErrLookupdsAddrEmpty = errors.New("nsq: lookupds addresses is empty")
 	// ErrTopicWithChannelNotFound for error when channel and topic is not found
 	ErrTopicWithChannelNotFound = errors.New("nsq: topic and channel not found")
-
-	defaultConcurrency      = 1
-	defaultBufferMultiplier = 50
 )
 
 // ProducerBackend for NSQ
@@ -36,7 +33,7 @@ type ConsumerBackend interface {
 	ConnectToNSQLookupds(addresses []string) error
 	ChangeMaxInFlight(n int)
 	Concurrency() int
-	BufferMultiplier() int
+	MaxInFlight() int
 }
 
 // Producer for nsq
@@ -179,15 +176,7 @@ func (c *Consumer) Handle(topic, channel string, handler HandlerFunc) {
 	// so its safe to skip the error here.
 	if backend != nil {
 		concurrency := backend.Concurrency()
-		buffMultiplier := backend.BufferMultiplier()
-
-		// Make sure concurrency and buffMultiplier values are correct.
-		if concurrency <= 0 {
-			concurrency = defaultConcurrency
-		}
-		if buffMultiplier <= 0 {
-			buffMultiplier = defaultBufferMultiplier
-		}
+		maxInFlight := backend.MaxInFlight()
 
 		// Determine the maximum length of buffer based on concurrency number
 		// for example, the concurrency have multiplication factor of 5.
@@ -200,10 +189,10 @@ func (c *Consumer) Handle(topic, channel string, handler HandlerFunc) {
 		// |message_processed|buffer|throttle_limit|throttle_limit|limit|
 		//          1           2            3             4         5
 		//
-		buffLen := concurrency * buffMultiplier
+		buffLen := concurrency * maxInFlight
 		h.messageBuff = make(chan *Message, buffLen)
 		h.stats.setConcurrency(concurrency)
-		h.stats.setBufferMultiplier(buffMultiplier)
+		h.stats.setMaxInFlight(maxInFlight)
 		h.stats.setBufferLength(buffLen)
 	}
 	c.handlers = append(c.handlers, h)

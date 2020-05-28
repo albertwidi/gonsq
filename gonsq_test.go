@@ -17,7 +17,7 @@ func TestStartStop(t *testing.T) {
 	)
 
 	fake := fakensq.New()
-	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, BufferMultiplier: 10})
+	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, MaxInFlight: 10})
 
 	wc, err := WrapConsumers([]string{"testing"}, consumer)
 	if err != nil {
@@ -95,7 +95,7 @@ func TestMiddlewareChaining(t *testing.T) {
 	}
 
 	fake := fakensq.New()
-	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, BufferMultiplier: 10})
+	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, MaxInFlight: 10})
 	publisher := fake.NewProducer()
 
 	wc, err := WrapConsumers([]string{"testing"}, consumer)
@@ -187,7 +187,7 @@ func TestGracefulStop(t *testing.T) {
 
 	for _, topic := range topics {
 		// Use at least 60 buffer length(1*60) because 10 message is sent into 3 different channel this test, so we don't get any throttle.
-		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic.topic, Channel: topic.channel, Concurrency: 1, BufferMultiplier: 60})
+		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic.topic, Channel: topic.channel, Concurrency: 1, MaxInFlight: 60})
 
 		wc.AddConsumers(consumer)
 		handler := HandlerFunc(func(ctx context.Context, message *Message) error {

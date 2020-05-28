@@ -12,6 +12,8 @@ var (
 	errTopicEmpty   = errors.New("gonsq: topic is empty")
 	errChannelEmpty = errors.New("gonsq: channel is empty")
 
+	defaultConcurrency         = 1
+	defaultMaxInFlight         = 50
 	defaultLookupdPoolInterval = time.Second
 	defaultWriteTimeout        = time.Second
 	defaultReadTimeout         = time.Second
@@ -80,18 +82,19 @@ func (cm *CompressionConfig) Validate() error {
 	return nil
 }
 
-// ConcurrencyConfig configure the concurrency for worker in nsq handler.
-// This config plays an important part in this library, because this library
-// don't use go-nsq concurrent handlers and maintain its own concurrency model.
+// ConcurrencyConfig control the concurrency flow in gonsq.
+// Concurrency and MaxInFlight are combined to determine the number of
+// buffered channel. This number then affect how the library throttle
+// the message consumption.
 type ConcurrencyConfig struct {
 	// Concurrency is the number of worker/goroutines intended for handling incoming/consumed messages.
 	Concurrency int
-	// BufferMultiplier is the multiplier factor of concurrency to set the size of buffer when consuming message
-	// the size of buffer multiplier is number of message being consumed before the buffer will be half full.
-	// For example, 20(default value) buffer multiplier means the worker is able to consume more than 10 message,
-	// before the buffer is half full from the nsqd message consumption.
-	// To fill this configuration correctly, it is needed to observe the consumption rate of the message and the handling rate of the worker.
-	BufferMultiplier int
+	// MaxInFlight is sort of comparable to the TCP "window size", it controls how many messages nsqd will send
+	// to the consumer before hearing back about any of them.
+	// This description is taken from https://github.com/nsqio/go-nsq/issues/221#issuecomment-352865779.
+	// Note that MaxInFlight number is the number per concurrent job. At the end, the length of buffered channel is
+	// MaxInflight * Concurrency.
+	MaxInFlight int
 }
 
 // Validate the value of concurrency config, if some value is not exist then set the default value.
@@ -99,8 +102,8 @@ func (cc *ConcurrencyConfig) Validate() error {
 	if cc.Concurrency <= 0 {
 		cc.Concurrency = defaultConcurrency
 	}
-	if cc.BufferMultiplier <= 0 {
-		cc.BufferMultiplier = defaultBufferMultiplier
+	if cc.MaxInFlight <= 0 {
+		cc.MaxInFlight = defaultMaxInFlight
 	}
 	return nil
 }
@@ -309,7 +312,7 @@ func (nc *NSQConsumer) Concurrency() int {
 	return nc.config.Concurrency.Concurrency
 }
 
-// BufferMultiplier return the buffer multiplier number for a given consumer
-func (nc *NSQConsumer) BufferMultiplier() int {
-	return nc.config.Concurrency.BufferMultiplier
+// MaxInFlight return the max in flight number for a given consumer
+func (nc *NSQConsumer) MaxInFlight() int {
+	return nc.config.Concurrency.MaxInFlight
 }

@@ -120,17 +120,23 @@ func (prod *Producer) Stop() {
 
 // ConsumerConfig of fake nsq
 type ConsumerConfig struct {
-	Topic            string
-	Channel          string
-	Concurrency      int
-	BufferMultiplier int
-	maxInFlight      int
+	Topic       string
+	Channel     string
+	Concurrency int
+	MaxInFlight int
 }
 
 // Validate consumer configuration
 func (cc *ConsumerConfig) Validate() error {
 	if cc.Topic == "" || cc.Channel == "" {
 		return errors.New("topic or channel cannot be empty")
+	}
+
+	if cc.Concurrency == 0 {
+		cc.Concurrency = 1
+	}
+	if cc.MaxInFlight == 0 {
+		cc.MaxInFlight = 50
 	}
 	return nil
 }
@@ -184,22 +190,17 @@ func (cons *Consumer) ConnectToNSQLookupds(addresses []string) error {
 
 // MaxInFlight return the maximum in flight number for nsq.
 func (cons *Consumer) MaxInFlight() int {
-	return cons.config.maxInFlight
+	return cons.config.MaxInFlight
 }
 
 // ChangeMaxInFlight message in nsq consumer
 func (cons *Consumer) ChangeMaxInFlight(n int) {
-	cons.config.maxInFlight = n
+	cons.config.MaxInFlight = n
 }
 
 // Concurrency return the number of conccurent worker
 func (cons *Consumer) Concurrency() int {
 	return cons.config.Concurrency
-}
-
-// BufferMultiplier return the number of buffer multiplier
-func (cons *Consumer) BufferMultiplier() int {
-	return cons.config.BufferMultiplier
 }
 
 // Start will start the message sending

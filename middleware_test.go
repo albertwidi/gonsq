@@ -30,12 +30,12 @@ func TestThrottleMiddleware(t *testing.T) {
 	)
 
 	// We are using fake consumer, this means the concurrency is always 1
-	// and the number of message buffer is 1 * bufferMultiplier.
-	buffMultiplier := 10
+	// and the number of message buffer is 1 * maxInFlight
+	maxInFlight := 10
 	concurrency := 1
 
 	fake := fakensq.New()
-	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, BufferMultiplier: buffMultiplier})
+	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 	publisher := fake.NewProducer()
 
 	wc, err := WrapConsumers([]string{"testing"}, consumer)
@@ -109,8 +109,8 @@ func TestThrottleMiddleware(t *testing.T) {
 		time.Sleep(time.Millisecond * 100)
 	}
 
-	// Note that in this test, we set the bufferMultiplier to 10.
-	// Send messages as much as (bufferMultiplier/2) + 3 to tirgger the throttle mechanism.
+	// Note that in this test, we set the maxInFlight to 10.
+	// Send messages as much as (maxInFlight/2) + 3 to tirgger the throttle mechanism.
 	//
 	// c = consumed
 	// d = done
@@ -147,7 +147,7 @@ func TestThrottleMiddleware(t *testing.T) {
 	// this is why, with lower number of messages the test won't pass,
 	// because it depends on messages number in the buffer.
 	//
-	for i := 1; i <= (buffMultiplier/2)+3; i++ {
+	for i := 1; i <= (maxInFlight/2)+3; i++ {
 		if err := publisher.Publish(topic, []byte(messageExpect)); err != nil {
 			t.Error(err)
 			return

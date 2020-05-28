@@ -49,8 +49,8 @@ func main() {
 				},
 			},
 			Concurrency: gonsq.ConcurrencyConfig{
-				Concurrency:      2,
-				BufferMultiplier: 100,
+				Concurrency: 2,
+				MaxInFlight: 100,
 			},
 		},
 	})

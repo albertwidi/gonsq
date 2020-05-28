@@ -11,34 +11,34 @@ import (
 
 func TestNSQHandlerSetConcurrency(t *testing.T) {
 	cases := []struct {
-		concurrency            int
-		buffMultiplier         int
-		expectConcurreny       int
-		expectBufferMultiplier int
+		concurrency       int
+		buffMultiplier    int
+		expectConcurreny  int
+		expectMaxInFlight int
 	}{
 		{
-			concurrency:            1,
-			buffMultiplier:         10,
-			expectConcurreny:       1,
-			expectBufferMultiplier: 10,
+			concurrency:       1,
+			buffMultiplier:    10,
+			expectConcurreny:  1,
+			expectMaxInFlight: 10,
 		},
 		{
-			concurrency:            -1,
-			buffMultiplier:         -1,
-			expectConcurreny:       defaultConcurrency,
-			expectBufferMultiplier: defaultBufferMultiplier,
+			concurrency:       -1,
+			buffMultiplier:    -1,
+			expectConcurreny:  defaultConcurrency,
+			expectMaxInFlight: defaultMaxInFlight,
 		},
 		{
-			concurrency:            1,
-			buffMultiplier:         1,
-			expectConcurreny:       1,
-			expectBufferMultiplier: 1,
+			concurrency:       1,
+			buffMultiplier:    1,
+			expectConcurreny:  1,
+			expectMaxInFlight: 1,
 		},
 		{
-			concurrency:            1,
-			buffMultiplier:         -1,
-			expectConcurreny:       1,
-			expectBufferMultiplier: defaultBufferMultiplier,
+			concurrency:       1,
+			buffMultiplier:    -1,
+			expectConcurreny:  1,
+			expectMaxInFlight: defaultMaxInFlight,
 		},
 	}
 
@@ -52,7 +52,7 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		t.Logf("buff_multiplier: %d", c.buffMultiplier)
 
 		fake := fakensq.New()
-		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: c.concurrency, BufferMultiplier: c.buffMultiplier})
+		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: c.concurrency, MaxInFlight: c.buffMultiplier})
 
 		wc, err := WrapConsumers([]string{"testing"}, consumer)
 		if err != nil {
@@ -70,12 +70,12 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		if handler.stats.Concurrency() != c.expectConcurreny {
 			t.Fatalf("expecting concurrency %d but got %d", c.expectConcurreny, handler.stats.Concurrency())
 		}
-		if handler.stats.BufferMultiplier() != c.expectBufferMultiplier {
-			t.Errorf("expecting buffer multiplier of %d but got %d", c.expectBufferMultiplier, handler.stats.BufferMultiplier())
+		if handler.stats.MaxInFlight() != c.expectMaxInFlight {
+			t.Errorf("expecting max in flight of %d but got %d", c.expectMaxInFlight, handler.stats.MaxInFlight())
 			return
 		}
-		if handler.stats.BufferLength() != c.expectConcurreny*c.expectBufferMultiplier {
-			t.Errorf("expecting buffer length of %d but got %d", c.expectConcurreny*c.expectBufferMultiplier, handler.stats.BufferLength())
+		if handler.stats.BufferLength() != c.expectConcurreny*c.expectMaxInFlight {
+			t.Errorf("expecting buffer length of %d but got %d", c.expectConcurreny*c.expectMaxInFlight, handler.stats.BufferLength())
 			return
 		}
 	}

@@ -1,5 +1,6 @@
-FROM golang:1.14.2
+FROM golang:1.14.3
 WORKDIR /gonsq/example/consumer
-COPY main.go .
+COPY ./consumer/main.go ./message ./
+RUN git config --global url."git@github.com:".insteadOf "https://github.com/"
 RUN go mod init github.com/albertwidi/gonsq && \
     CGO_ENABLED=0 GOOS=linux go build -v -o consumer main.go

@@ -1,6 +1,8 @@
 # Gonsq
 
-Wrapper of [go-nsq](https://github.com/nsqio/go-nsq) library
+**Work In Progress**
+
+Gonsq is a wrapper of [go-nsq](https://github.com/nsqio/go-nsq) library
 
 The library inspired by how [Lyft Building an Adaptive, Multi-Tenant Stream Bus with Kafka and Golang](https://eng.lyft.com/building-an-adaptive-multi-tenant-stream-bus-with-kafka-and-golang-5f1410bf2b40) and [Flow Control architecture in envoy proxy](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md).
 

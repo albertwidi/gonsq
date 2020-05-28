@@ -15,18 +15,22 @@ var (
 	defaultConcurrency         = 1
 	defaultMaxInFlight         = 50
 	defaultLookupdPoolInterval = time.Second
-	defaultWriteTimeout        = time.Second
-	defaultReadTimeout         = time.Second
-	defaultDeflateLevel        = 1
+	defaultWriteTimeout        = time.Second * 10
+	defaultReadTimeout         = time.Second * 10
+	// defaultHeartBeatInterval must be less than write timeout.
+	defaultHeartBeatInterval = time.Second * 9
+	defaultDeflateLevel      = 1
 )
 
 // Config of nsqio
 type Config struct {
-	Hostname    string
-	Lookupd     LookupdConfig
-	Timeout     TimeoutConfig
-	Queue       QueueConfig
-	Compression CompressionConfig
+	Hostname string
+	// This must be less than Timeout.WriteTimeout
+	HeartbeatInterval time.Duration
+	Lookupd           LookupdConfig
+	Timeout           TimeoutConfig
+	Queue             QueueConfig
+	Compression       CompressionConfig
 }
 
 // TimeoutConfig for timeout configuration
@@ -121,6 +125,7 @@ func newConfig(conf Config) (*nsqio.Config, error) {
 
 	// Basic configuration properties
 	cfg.Hostname = conf.Hostname
+	cfg.HeartbeatInterval = conf.HeartbeatInterval
 	// Queue configuration properties.
 	cfg.MsgTimeout = conf.Queue.MsgTimeout
 	cfg.MaxRequeueDelay = conf.Queue.MaxRequeueDelay
@@ -199,14 +204,16 @@ func (np *NSQProducer) Stop() {
 
 // NSQConsumerConfig for nsq consumer
 type NSQConsumerConfig struct {
-	Hostname    string
-	Topic       string
-	Channel     string
-	Lookupd     LookupdConfig
-	Timeout     TimeoutConfig
-	Queue       QueueConfig
-	Compression CompressionConfig
-	Concurrency ConcurrencyConfig
+	Hostname string
+	Topic    string
+	Channel  string
+	// This must be less than Timeout.WriteTimeout
+	HeartbeatInterval time.Duration
+	Lookupd           LookupdConfig
+	Timeout           TimeoutConfig
+	Queue             QueueConfig
+	Compression       CompressionConfig
+	Concurrency       ConcurrencyConfig
 }
 
 // Validate consumer configuration
@@ -216,6 +223,10 @@ func (cf *NSQConsumerConfig) Validate() error {
 	}
 	if cf.Channel == "" {
 		return errChannelEmpty
+	}
+
+	if cf.HeartbeatInterval == 0 {
+		cf.HeartbeatInterval = defaultHeartBeatInterval
 	}
 
 	if err := cf.Lookupd.Validate(); err != nil {

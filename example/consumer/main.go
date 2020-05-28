@@ -34,6 +34,8 @@ func main() {
 	flag.IntVar(&f.Concurrency, "nsq.concurrency", 1, "concurrency number to consume message from nsq")
 	flag.Parse()
 
+	fmt.Printf("flags:\n%+v\n", f)
+
 	c, err := consumer.NewGroup(context.Background(), []string{f.NSQLookupdAddress}, []consumer.Group{
 		{
 			Topic: f.Topic,

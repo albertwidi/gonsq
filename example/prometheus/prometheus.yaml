@@ -3,4 +3,4 @@ scrape_configs:
   scrape_interval: 10s
   static_configs:
   - targets:
-    - nsq_consumer:8080
+    - nsq_consumer:9000

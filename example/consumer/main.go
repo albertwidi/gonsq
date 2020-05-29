@@ -65,6 +65,10 @@ func main() {
 		groups = append(groups, consumer.Group{
 			Topic:    strings.TrimSpace(topic),
 			Channels: groupChannels,
+			Concurrency: gonsq.ConcurrencyConfig{
+				Concurrency: f.Concurrency,
+				MaxInFlight: f.MaxInFlight,
+			},
 		})
 	}
 

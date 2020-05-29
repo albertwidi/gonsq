@@ -28,7 +28,7 @@ services:
         - nsqlookupd
 
     prometheus:
-        image: prom/prometheus:latest
+        image: prom/prometheus:2.18.1
         container_name: prometheus
         ports:
         - 9090:9090
@@ -43,14 +43,14 @@ services:
         - "3000:3000"
 
     nsqlookupd:
-        image: nsqio/nsq
+        image: nsqio/nsq:1.2.0
         command: /nsqlookupd
         ports:
         - "4160"
         - "4161"
 
     nsqd:
-        image: nsqio/nsq
+        image: nsqio/nsq:1.2.0
         command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
         depends_on:
         - nsqlookupd
@@ -59,7 +59,7 @@ services:
         - "4151"
 
     nsqadmin:
-        image: nsqio/nsq
+        image: nsqio/nsq:1.2.0
         command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
         depends_on:
         - nsqlookupd  

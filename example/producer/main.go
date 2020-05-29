@@ -12,10 +12,11 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/albertwidi/gonsq/producer"
+
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
-	"github.com/albertwidi/gonsq"
 	id_message "github.com/albertwidi/gonsq/example/message"
 )
 
@@ -36,10 +37,10 @@ func main() {
 	var topics = strings.Split(f.Topics, ",")
 	var stopC chan struct{}
 
-	producer, err := gonsq.NewProducer(context.Background(), gonsq.ProducerConfig{
-		Hostname: "gonsq-producer",
-		Address:  f.NSQDAddress,
-	})
+	producer, err := producer.New(context.Background(), producer.Producer{
+		Hostname:   "gonsq-producer",
+		NSQAddress: f.NSQDAddress,
+	}, topics...)
 	if err != nil {
 		panic(err)
 	}

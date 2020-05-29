@@ -31,6 +31,8 @@ func main() {
 	flag.StringVar(&f.NSQDAddress, "nsq.nsqd-address", "", "NSQD Address")
 	flag.Parse()
 
+	fmt.Printf("flags:\n%+v\n", f)
+
 	var topics = strings.Split(f.Topics, ",")
 	var stopC chan struct{}
 

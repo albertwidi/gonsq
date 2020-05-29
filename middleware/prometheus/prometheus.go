@@ -19,7 +19,7 @@ const (
 	_nsqMessageInBuffGauge
 )
 
-var metrics = map[int]prometheus.Collector{
+var metrics = []prometheus.Collector{
 	_nsqMessageRetrievedCount: prometheus.NewCounterVec(
 		prometheus.CounterOpts{
 			Name: "nsq_message_retrieved_total",

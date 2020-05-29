@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package random_message;
-
-message Random {
-    string RandomString = 1;
-    string RandomNumber = 2;
-}

@@ -1,0 +1,7 @@
+syntax = "proto3";
+
+package id_message;
+
+message ID {
+    string UUID = 1;
+}

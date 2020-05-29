@@ -1,6 +1,6 @@
-# Custom Prometheus Middleware For NSQ
+# Prometheus Middleware For Gonsq
 
-This is a custom prometheus middleware for NSQ to expose metrics data for NSQ
+This is a prometheus middleware for NSQ to expose metrics data for NSQ
 
 ## Usage
 
@@ -8,7 +8,7 @@ To use this library, simply append the `Metrics` function into the `nsq` library
 
 ```go
 import (
-    promemw "github.com/albertwidi/gonsq/prometheus-middleware"
+    promemw "github.com/albertwidi/gonsq/middleware/prometheus"
     "github.com/albertwidi/gonsq/"
 )
 

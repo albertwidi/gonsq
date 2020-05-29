@@ -1,4 +1,4 @@
-package gonsq
+package throttle
 
 import (
 	"context"
@@ -8,6 +8,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/albertwidi/gonsq"
 	fakensq "github.com/albertwidi/gonsq/fakensq"
 )
 
@@ -38,19 +39,19 @@ func TestThrottleMiddleware(t *testing.T) {
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 	publisher := fake.NewProducer()
 
-	wc, err := WrapConsumers([]string{"testing"}, consumer)
+	wc, err := gonsq.WrapConsumers([]string{"testing"}, consumer)
 	if err != nil {
 		t.Error(err)
 		return
 	}
 
-	tm := ThrottleMiddleware{TimeDelay: time.Millisecond * 10}
+	tm := Throttle{TimeDelay: time.Millisecond * 10}
 	// Use throttle middleware.
 	wc.Use(
 		tm.Throttle,
 	)
 
-	wc.Handle(topic, channel, func(ctx context.Context, message *Message) error {
+	wc.Handle(topic, channel, func(ctx context.Context, message *gonsq.Message) error {
 		testpublishedMessageCount := atomic.AddInt32(&workerMessageCount, 1)
 
 		if string(message.Message.Body) != messageExpect {

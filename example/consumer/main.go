@@ -2,11 +2,13 @@ package main
 
 import (
 	"context"
+	"errors"
 	"flag"
 	"fmt"
 	"net/http"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -15,64 +17,77 @@ import (
 
 	"github.com/albertwidi/gonsq"
 	"github.com/albertwidi/gonsq/consumer"
-	random_message "github.com/albertwidi/gonsq/example/message"
-	prommw "github.com/albertwidi/gonsq/middlewares/prometheus"
+	id_message "github.com/albertwidi/gonsq/example/message"
+	prommw "github.com/albertwidi/gonsq/middleware/prometheus"
+	"github.com/albertwidi/gonsq/middleware/throttle"
 )
 
 type Flags struct {
 	Address           string
-	Topic             string
+	Topics            string
+	Channels          string
 	NSQLookupdAddress string
 	Concurrency       int
+	MaxInFlight       int
 }
 
 func main() {
 	f := Flags{}
 	flag.StringVar(&f.Address, "server.address", ":9000", "Server Address")
-	flag.StringVar(&f.Topic, "nsq.topic", "", "NSQ Topic")
+	flag.StringVar(&f.Topics, "nsq.topics", "", "NSQ Topics")
+	flag.StringVar(&f.Channels, "nsq.channels", "", "NSQ Channels")
 	flag.StringVar(&f.NSQLookupdAddress, "nsq.lookupd-address", "", "NSQ Lookupd Address")
 	flag.IntVar(&f.Concurrency, "nsq.concurrency", 1, "concurrency number to consume message from nsq")
+	flag.IntVar(&f.MaxInFlight, "nsq.maxinflight", 100, "max in flight number")
 	flag.Parse()
 
 	fmt.Printf("flags:\n%+v\n", f)
 
-	c, err := consumer.NewGroup(context.Background(), []string{f.NSQLookupdAddress}, []consumer.Group{
-		{
-			Topic: f.Topic,
-			Channels: []consumer.Channel{
-				{
-					Name: "random1",
-				},
-				{
-					Name: "random2",
-				},
-				{
-					Name: "random3",
-				},
-			},
-			Concurrency: gonsq.ConcurrencyConfig{
-				Concurrency: 2,
-				MaxInFlight: 100,
-			},
-		},
-	})
+	var groups []consumer.Group
+	var groupChannels []consumer.Channel
+	var topics = strings.Split(f.Topics, ",")
+	var channels = strings.Split(f.Channels, ",")
 
+	if len(topics) == 0 {
+		panic("groups is empty")
+	}
+	if len(channels) == 0 {
+		panic("channels is empty")
+	}
+
+	for _, channel := range channels {
+		groupChannels = append(groupChannels, consumer.Channel{
+			Name: strings.TrimSpace(channel),
+		})
+	}
+
+	for _, topic := range topics {
+		groups = append(groups, consumer.Group{
+			Topic:    strings.TrimSpace(topic),
+			Channels: groupChannels,
+		})
+	}
+
+	c, err := consumer.NewGroup(context.Background(), []string{f.NSQLookupdAddress}, groups)
 	if err != nil {
 		panic(err)
 	}
 
 	// Initialize throttle middleware.
-	throttle := gonsq.ThrottleMiddleware{
+	tmw := throttle.Throttle{
 		TimeDelay: time.Second,
 	}
 
 	// Chain the middleware, make sure
 	// metrics is always the first middleware.
-	c.Use(prommw.Metrics, throttle.Throttle)
+	c.Use(prommw.Metrics, tmw.Throttle)
 
-	c.Handle(f.Topic, "random1", handler)
-	c.Handle(f.Topic, "random2", handler)
-	c.Handle(f.Topic, "random3", handler)
+	// Handle all topic and channels.
+	for _, topic := range topics {
+		for _, channel := range channels {
+			c.Handle(topic, channel, handler)
+		}
+	}
 
 	if err := c.Start(); err != nil {
 		panic(err)
@@ -103,13 +118,17 @@ func main() {
 }
 
 func handler(ctx context.Context, message *gonsq.Message) error {
-	rm := random_message.Random{}
+	rm := id_message.ID{}
 	if err := proto.Unmarshal(message.Body, &rm); err != nil {
 		return err
 	}
 
 	defer message.Finish()
-	fmt.Println(message.Topic, message.Channel, rm.RandomString, rm.RandomNumber)
+
+	// Sends some occasional error.
+	if message.Stats.MessageCount()%3 == 0 {
+		return errors.New("return some error")
+	}
 
 	return nil
 }

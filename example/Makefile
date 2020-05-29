@@ -1,6 +1,6 @@
 GOPATH := $(shell go env GOPATH)
 
-PROTO_FILE = ./message/random.proto
+PROTO_FILE = ./message/id.proto
 
 .PHONY: compile-proto
 compile-proto:

@@ -33,6 +33,25 @@ type Config struct {
 	Compression       CompressionConfig
 }
 
+func (c *Config) Validate() error {
+	if c.HeartbeatInterval == 0 {
+		c.HeartbeatInterval = defaultHeartBeatInterval
+	}
+
+	if err := c.Lookupd.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Timeout.Validate(); err != nil {
+		return err
+	}
+
+	if err := c.Compression.Validate(); err != nil {
+		return err
+	}
+	return nil
+}
+
 // TimeoutConfig for timeout configuration
 type TimeoutConfig struct {
 	Dial           time.Duration `toml:"dial" yaml:"dial"`
@@ -121,6 +140,10 @@ func (cc ConcurrencyConfig) IsEmpty() bool {
 }
 
 func newConfig(conf Config) (*nsqio.Config, error) {
+	if err := conf.Validate(); err != nil {
+		return nil, err
+	}
+
 	cfg := nsqio.NewConfig()
 
 	// Basic configuration properties
@@ -154,18 +177,6 @@ type ProducerConfig struct {
 	Timeout     TimeoutConfig
 }
 
-func (pc *ProducerConfig) Validate() error {
-	if err := pc.Timeout.Validate(); err != nil {
-		return err
-	}
-
-	if err := pc.Compression.Validate(); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 // NSQProducer backend
 type NSQProducer struct {
 	producer *nsqio.Producer
@@ -173,10 +184,6 @@ type NSQProducer struct {
 
 // NewProducer return a new producer
 func NewProducer(ctx context.Context, config ProducerConfig) (*NSQProducer, error) {
-	if err := config.Validate(); err != nil {
-		return nil, err
-	}
-
 	conf := Config{
 		Hostname:    config.Hostname,
 		Timeout:     config.Timeout,
@@ -242,23 +249,7 @@ func (cf *NSQConsumerConfig) Validate() error {
 		return errChannelEmpty
 	}
 
-	if cf.HeartbeatInterval == 0 {
-		cf.HeartbeatInterval = defaultHeartBeatInterval
-	}
-
-	if err := cf.Lookupd.Validate(); err != nil {
-		return err
-	}
-
-	if err := cf.Timeout.Validate(); err != nil {
-		return err
-	}
-
 	if err := cf.Concurrency.Validate(); err != nil {
-		return err
-	}
-
-	if err := cf.Compression.Validate(); err != nil {
 		return err
 	}
 

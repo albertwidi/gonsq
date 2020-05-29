@@ -1,18 +1,5 @@
 version: '3'
 services:
-    nsq_consumer:
-        build:
-            context: .
-            dockerfile: Dockerfile.consumer
-        ports:
-        - "9000:9000"
-        command:
-        - --server.address=:9000
-        - --nsq.topics=foo,bar
-        - --nsq.channels=c1,c2,c3
-        - --nsq.lookupd-address=nsqlookupd:4161
-        - --nsq.concurrency=2
-    
     nsq_producer:
         build:
             context: .
@@ -20,45 +7,55 @@ services:
         command:
         - --nsq.topics=foo,bar
         - --nsq.nsqd-address=nsqd:4151
-        depends_on: 
-        - nsqd 
-        - nsq_consumer
 
-    prometheus:
-        image: prom/prometheus:latest
-        container_name: prometheus
-        ports:
-        - 9090:9090
-        command:
-        - --config.file=/etc/prometheus/prometheus.yml
-        volumes:
-        - .prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    # nsq_consumer:
+    #     build:
+    #         context: .
+    #         dockerfile: Dockerfile.consumer
+    #     ports:
+    #     - "9000:9000"
+    #     command:
+    #     - --server.address=:9000
+    #     - --nsq.topics=foo,bar
+    #     - --nsq.channels=c1,c2,c3
+    #     - --nsq.lookupd-address=nsqlookupd:4161
+    #     - --nsq.concurrency=2
 
-    grafana:
-        image: grafana/grafana:7.0.1
-        ports:
-        - "3000:3000"
+    # prometheus:
+    #     image: prom/prometheus:latest
+    #     container_name: prometheus
+    #     ports:
+    #     - 9090:9090
+    #     command:
+    #     - --config.file=/etc/prometheus/prometheus.yml
+    #     volumes:
+    #     - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
 
-    nsqlookupd:
-        image: nsqio/nsq
-        command: /nsqlookupd
-        ports:
-        - "4160"
-        - "4161"
+    # grafana:
+    #     image: grafana/grafana:7.0.1
+    #     ports:
+    #     - "3000:3000"
 
-    nsqd:
-        image: nsqio/nsq
-        command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
-        depends_on:
-        - nsqlookupd
-        ports:
-        - "4150"
-        - "4151"
+    # nsqlookupd:
+    #     image: nsqio/nsq
+    #     command: /nsqlookupd
+    #     ports:
+    #     - "4160"
+    #     - "4161"
 
-    nsqadmin:
-        image: nsqio/nsq
-        command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
-        depends_on:
-        - nsqlookupd  
-        ports:
-        - "4171:4171"
+    # nsqd:
+    #     image: nsqio/nsq
+    #     command: /nsqd --lookupd-tcp-address=nsqlookupd:4160
+    #     depends_on:
+    #     - nsqlookupd
+    #     ports:
+    #     - "4150"
+    #     - "4151"
+
+    # nsqadmin:
+    #     image: nsqio/nsq
+    #     command: /nsqadmin --lookupd-http-address=nsqlookupd:4161
+    #     depends_on:
+    #     - nsqlookupd  
+    #     ports:
+    #     - "4171:4171"

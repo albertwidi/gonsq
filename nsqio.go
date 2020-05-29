@@ -154,6 +154,18 @@ type ProducerConfig struct {
 	Timeout     TimeoutConfig
 }
 
+func (pc *ProducerConfig) Validate() error {
+	if err := pc.Timeout.Validate(); err != nil {
+		return err
+	}
+
+	if err := pc.Compression.Validate(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // NSQProducer backend
 type NSQProducer struct {
 	producer *nsqio.Producer
@@ -161,11 +173,16 @@ type NSQProducer struct {
 
 // NewProducer return a new producer
 func NewProducer(ctx context.Context, config ProducerConfig) (*NSQProducer, error) {
+	if err := config.Validate(); err != nil {
+		return nil, err
+	}
+
 	conf := Config{
 		Hostname:    config.Hostname,
 		Timeout:     config.Timeout,
 		Compression: config.Compression,
 	}
+
 	nsqConf, err := newConfig(conf)
 	if err != nil {
 		return nil, err

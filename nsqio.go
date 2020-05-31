@@ -34,7 +34,7 @@ type Config struct {
 }
 
 func (c *Config) Validate() error {
-	if c.HeartbeatInterval == 0 {
+	if c.HeartbeatInterval <= 0 {
 		c.HeartbeatInterval = defaultHeartBeatInterval
 	}
 
@@ -61,10 +61,10 @@ type TimeoutConfig struct {
 }
 
 func (tm *TimeoutConfig) Validate() error {
-	if tm.Read == 0 {
+	if tm.Read <= 0 {
 		tm.Read = defaultReadTimeout
 	}
-	if tm.Write == 0 {
+	if tm.Write <= 0 {
 		tm.Write = defaultWriteTimeout
 	}
 	return nil
@@ -77,7 +77,7 @@ type LookupdConfig struct {
 }
 
 func (ld *LookupdConfig) Validate() error {
-	if ld.PoolInterval == 0 {
+	if ld.PoolInterval <= 0 {
 		ld.PoolInterval = defaultLookupdPoolInterval
 	}
 	return nil
@@ -99,7 +99,7 @@ type CompressionConfig struct {
 }
 
 func (cm *CompressionConfig) Validate() error {
-	if cm.DeflateLevel == 0 {
+	if cm.DeflateLevel <= 0 {
 		cm.DeflateLevel = defaultDeflateLevel
 	}
 	return nil

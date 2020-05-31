@@ -10,9 +10,12 @@ import (
 )
 
 var (
-	ErrLookupdsAddrEmpty = errors.New("nsq: lookupds addresses is empty")
-	// ErrTopicWithChannelNotFound for error when channel and topic is not found
-	ErrTopicWithChannelNotFound = errors.New("nsq: topic and channel not found")
+	// ErrInvalidConcurrencyConfiguration happens when concurrency configuration number is not
+	// as expected. The configuration is checked when adding new consumer.
+	ErrInvalidConcurrencyConfiguration = errors.New("gonsq: invalid concurrency configuration")
+	ErrLookupdsAddrEmpty               = errors.New("gonsq: lookupds addresses is empty")
+	// ErrTopicWithChannelNotFound for error when channel and topic is not found.
+	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
 )
 
 // ProducerBackend for NSQ
@@ -101,6 +104,10 @@ func WrapConsumers(lookupdsAddr []string, backends ...ConsumerBackend) (*Consume
 // AddConsumers add more consumers to the consumer object.
 func (c *Consumer) AddConsumers(backends ...ConsumerBackend) error {
 	for _, b := range backends {
+		if b.Concurrency() <= 0 || b.MaxInFlight() <= 0 {
+			return fmt.Errorf("%w,concurrency: %d, maxInFlight: %d", ErrInvalidConcurrencyConfiguration, b.Concurrency(), b.MaxInFlight())
+		}
+
 		topic := b.Topic()
 		channel := b.Channel()
 

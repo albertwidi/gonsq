@@ -12,12 +12,11 @@ import (
 	"strings"
 	"syscall"
 
-	"github.com/albertwidi/gonsq/producer"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
 	id_message "github.com/albertwidi/gonsq/example/message"
+	"github.com/albertwidi/gonsq/producer"
 )
 
 type Flags struct {

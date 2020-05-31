@@ -2,6 +2,7 @@ package gonsq
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -15,30 +16,35 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		buffMultiplier    int
 		expectConcurreny  int
 		expectMaxInFlight int
+		expectError       error
 	}{
 		{
 			concurrency:       1,
 			buffMultiplier:    10,
 			expectConcurreny:  1,
 			expectMaxInFlight: 10,
+			expectError:       nil,
 		},
 		{
 			concurrency:       -1,
 			buffMultiplier:    -1,
 			expectConcurreny:  defaultConcurrency,
 			expectMaxInFlight: defaultMaxInFlight,
+			expectError:       ErrInvalidConcurrencyConfiguration,
 		},
 		{
 			concurrency:       1,
 			buffMultiplier:    1,
 			expectConcurreny:  1,
 			expectMaxInFlight: 1,
+			expectError:       nil,
 		},
 		{
 			concurrency:       1,
 			buffMultiplier:    -1,
 			expectConcurreny:  1,
 			expectMaxInFlight: defaultMaxInFlight,
+			expectError:       ErrInvalidConcurrencyConfiguration,
 		},
 	}
 
@@ -55,10 +61,15 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: c.concurrency, MaxInFlight: c.buffMultiplier})
 
 		wc, err := WrapConsumers([]string{"testing"}, consumer)
-		if err != nil {
-			t.Error(err)
+		if !errors.Is(err, c.expectError) {
+			t.Errorf("expecting error %v but got %v", c.expectError, err)
 			return
 		}
+
+		if c.expectError != nil {
+			return
+		}
+
 		// Trigger the creation of handler.
 		wc.Handle(topic, channel, nil)
 
@@ -86,10 +97,11 @@ func TestNSQHandlerConcurrencyControl(t *testing.T) {
 		topic       = "test_concurrency"
 		channel     = "test_concurrency"
 		concurrency = 5
+		maxInFlight = 500
 	)
 
 	fake := fakensq.New()
-	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency})
+	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 
 	wc, err := WrapConsumers([]string{"testing"}, consumer)
 	if err != nil {

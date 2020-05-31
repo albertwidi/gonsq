@@ -13,7 +13,8 @@ var (
 	// ErrInvalidConcurrencyConfiguration happens when concurrency configuration number is not
 	// as expected. The configuration is checked when adding new consumer.
 	ErrInvalidConcurrencyConfiguration = errors.New("gonsq: invalid concurrency configuration")
-	ErrLookupdsAddrEmpty               = errors.New("gonsq: lookupds addresses is empty")
+	// ErrLookupdsAddrEmpty happens when NSQ lookupd address is empty when wrapping consumers.
+	ErrLookupdsAddrEmpty = errors.New("gonsq: lookupds addresses is empty")
 	// ErrTopicWithChannelNotFound for error when channel and topic is not found.
 	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
 )
@@ -39,8 +40,8 @@ type ConsumerBackend interface {
 	MaxInFlight() int
 }
 
-// Producer for nsq
-type Producer struct {
+// ProducerManager for nsq
+type ProducerManager struct {
 	producer ProducerBackend
 	topics   map[string]bool
 }
@@ -49,8 +50,8 @@ type Producer struct {
 // The function receive topics parameters because in NSQ, we can publish message
 // without registering any new topics. This sometimes can be problematic as
 // we don't have a list of topics that we will publish the message to.
-func WrapProducer(backend ProducerBackend, topics ...string) (*Producer, error) {
-	p := Producer{
+func WrapProducer(backend ProducerBackend, topics ...string) (*ProducerManager, error) {
+	p := ProducerManager{
 		producer: backend,
 		topics:   make(map[string]bool),
 	}
@@ -61,7 +62,7 @@ func WrapProducer(backend ProducerBackend, topics ...string) (*Producer, error) 
 }
 
 // Publish message to nsqd
-func (p *Producer) Publish(topic string, body []byte) error {
+func (p *ProducerManager) Publish(topic string, body []byte) error {
 	if ok := p.topics[topic]; !ok {
 		return errors.New("nsq: topic is not allowed to be published by this producer")
 	}
@@ -69,15 +70,15 @@ func (p *Producer) Publish(topic string, body []byte) error {
 }
 
 // MultiPublish message to nsqd
-func (p *Producer) MultiPublish(topic string, body [][]byte) error {
+func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
 	if ok := p.topics[topic]; !ok {
 		return errors.New("nsq: topic is not allowed to be published by this producer")
 	}
 	return p.producer.MultiPublish(topic, body)
 }
 
-// Consumer for nsq
-type Consumer struct {
+// ConsumerManager for nsq
+type ConsumerManager struct {
 	lookupdsAddr []string
 	handlers     []*gonsqHandler
 	middlewares  []MiddlewareFunc
@@ -89,12 +90,12 @@ type Consumer struct {
 }
 
 // WrapConsumers of gonsq
-func WrapConsumers(lookupdsAddr []string, backends ...ConsumerBackend) (*Consumer, error) {
+func WrapConsumers(lookupdsAddr []string, backends ...ConsumerBackend) (*ConsumerManager, error) {
 	if lookupdsAddr == nil {
 		return nil, ErrLookupdsAddrEmpty
 	}
 
-	c := Consumer{
+	c := ConsumerManager{
 		lookupdsAddr: lookupdsAddr,
 		backends:     make(map[string]map[string]ConsumerBackend),
 	}
@@ -102,7 +103,7 @@ func WrapConsumers(lookupdsAddr []string, backends ...ConsumerBackend) (*Consume
 }
 
 // AddConsumers add more consumers to the consumer object.
-func (c *Consumer) AddConsumers(backends ...ConsumerBackend) error {
+func (c *ConsumerManager) AddConsumers(backends ...ConsumerBackend) error {
 	for _, b := range backends {
 		if b.Concurrency() <= 0 || b.MaxInFlight() <= 0 {
 			return fmt.Errorf("%w,concurrency: %d, maxInFlight: %d", ErrInvalidConcurrencyConfiguration, b.Concurrency(), b.MaxInFlight())
@@ -120,7 +121,7 @@ func (c *Consumer) AddConsumers(backends ...ConsumerBackend) error {
 }
 
 // Backends return information regarding topic and channel that avaialbe
-func (c *Consumer) Backends() map[string]map[string]bool {
+func (c *ConsumerManager) Backends() map[string]map[string]bool {
 	m := map[string]map[string]bool{}
 	for topic, channels := range c.backends {
 		for channel := range channels {
@@ -137,7 +138,7 @@ func (c *Consumer) Backends() map[string]map[string]bool {
 // use should be called before handle function
 // this function will avoid to add the same middleware twice
 // if the same middleware is used, it will skip the addition
-func (c *Consumer) Use(middleware ...MiddlewareFunc) {
+func (c *ConsumerManager) Use(middleware ...MiddlewareFunc) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -159,7 +160,7 @@ func (c *Consumer) Use(middleware ...MiddlewareFunc) {
 
 // Handle to register the message handler function.
 // Only for reigstering the message handler into the consumer.
-func (c *Consumer) Handle(topic, channel string, handler HandlerFunc) {
+func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
@@ -206,7 +207,7 @@ func (c *Consumer) Handle(topic, channel string, handler HandlerFunc) {
 }
 
 // Start for start the consumer. This will trigger all workers to start.
-func (c *Consumer) Start() error {
+func (c *ConsumerManager) Start() error {
 	for _, handler := range c.handlers {
 		backend, ok := c.backends[handler.topic][handler.channel]
 		if !ok {
@@ -239,12 +240,12 @@ func (c *Consumer) Start() error {
 }
 
 // Started return the status of the consumer, whether the consumer started or not.
-func (c *Consumer) Started() bool {
+func (c *ConsumerManager) Started() bool {
 	return c.started
 }
 
 // Stop for stopping all the nsq consumer.
-func (c *Consumer) Stop() error {
+func (c *ConsumerManager) Stop() error {
 	// Stopping all NSQ backends. This should make message consumption to nsqHandler stop.
 	for _, channels := range c.backends {
 		for _, backend := range channels {

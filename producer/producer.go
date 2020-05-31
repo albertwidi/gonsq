@@ -13,7 +13,7 @@ type Producer struct {
 	Compression gonsq.CompressionConfig
 }
 
-func New(ctx context.Context, producer Producer, topic ...string) (*gonsq.Producer, error) {
+func New(ctx context.Context, producer Producer, topic ...string) (*gonsq.ProducerManager, error) {
 	p, err := gonsq.NewProducer(context.Background(), gonsq.ProducerConfig{
 		Hostname:    producer.Hostname,
 		Address:     producer.NSQAddress,

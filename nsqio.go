@@ -324,6 +324,7 @@ func (nc *NSQConsumer) Stop() {
 // ChangeMaxInFlight will change max in flight number in nsq consumer
 func (nc *NSQConsumer) ChangeMaxInFlight(n int) {
 	nc.consumer.ChangeMaxInFlight(n)
+	nc.config.Concurrency.MaxInFlight = n
 }
 
 // Concurrency return the concurrency number for a given consumer

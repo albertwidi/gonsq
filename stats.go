@@ -20,24 +20,23 @@
 package gonsq
 
 import (
-	"sync"
 	"sync/atomic"
 )
 
-// Throttleb is a boolean type for throttle status.
-type Throttleb bool
+// statsb is a boolean type for throttle status.
+type statsb bool
 
 // Int return int value of throttle status
-func (t Throttleb) Int() int {
-	if !t {
+func (sb statsb) Int() int {
+	if !sb {
 		return 0
 	}
 	return 1
 }
 
 // Boolean return boolean value of throttle status
-func (t Throttleb) Boolean() bool {
-	return bool(t)
+func (sb statsb) Boolean() bool {
+	return bool(sb)
 }
 
 // Stats object to be included in every nsq consumer worker
@@ -62,11 +61,10 @@ type Stats struct {
 	// Worker is the current number of message processing worker.
 	worker int64
 	// Throttle is the status of throttle, true means throttle is on.
-	throttle Throttleb
+	throttle statsb
 	// Concurrency is the number of concurrency intended for the consumer.
 	concurrency int
 	maxInFlight int
-	mu          sync.Mutex
 }
 
 func (s *Stats) addMessageCount(count uint64) uint64 {
@@ -133,12 +131,12 @@ func (s *Stats) Worker() int64 {
 	return s.worker
 }
 
-func (s *Stats) setThrottle(b bool) Throttleb {
-	s.throttle = Throttleb(b)
+func (s *Stats) setThrottle(b bool) statsb {
+	s.throttle = statsb(b)
 	return s.throttle
 }
 
 // Throttle return whether the consumer/producer is being throttled or not.
-func (s *Stats) Throttle() Throttleb {
+func (s *Stats) Throttle() statsb {
 	return s.throttle
 }

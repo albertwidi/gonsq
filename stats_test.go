@@ -102,3 +102,33 @@ func TestStatsWorker(t *testing.T) {
 		t.Fatal("expect worker to be 0")
 	}
 }
+
+func TestStatsConcurrency(t *testing.T) {
+	concurrencies := []int{
+		10, 50, 100, 500, 1000, 10000, 100000,
+	}
+	s := Stats{}
+
+	for _, concurrency := range concurrencies {
+		s.setConcurrency(concurrency)
+
+		if s.Concurrency() != concurrency {
+			t.Fatalf("expect %d concurrency but got %d", concurrency, s.Concurrency())
+		}
+	}
+}
+
+func TestStatsMaxInFlight(t *testing.T) {
+	maxInFlights := []int{
+		10, 50, 100, 500, 1000, 10000, 100000,
+	}
+	s := Stats{}
+
+	for _, maxInFlight := range maxInFlights {
+		s.setMaxInFlight(maxInFlight)
+
+		if s.MaxInFlight() != maxInFlight {
+			t.Fatalf("expect %d max in flight but got %d", maxInFlight, s.MaxInFlight())
+		}
+	}
+}

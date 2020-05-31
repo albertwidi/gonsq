@@ -124,6 +124,14 @@ func TestNewNSQConsumer(t *testing.T) {
 			if c.Channel() != test.config.Channel {
 				t.Fatalf("expecting topic %s but got %s", test.config.Channel, c.Channel())
 			}
+
+			if c.Concurrency() != test.config.Concurrency.Concurrency {
+				t.Fatalf("expecting concurrency %d but got %d", test.config.Concurrency.Concurrency, c.Concurrency())
+			}
+
+			if c.MaxInFlight() != test.config.Concurrency.MaxInFlight {
+				t.Fatalf("expecting max in flight %d but got %d", test.config.Concurrency.MaxInFlight, c.MaxInFlight())
+			}
 		})
 	}
 }

@@ -31,4 +31,4 @@ jobs:
         fi
 
     - name: Test
-      run: go test -v ./... -count=10 -timeout 15m
+      run: go test -v -count=1 -timeout 15m ./...

@@ -9,3 +9,8 @@ compile-proto:
 		-I$(GOPATH)/src \
 		--go_out=plugins=grpc:./ \
 		$(PROTO_FILE)
+
+.PHONY: compose-up
+compose-up:
+	@docker-compose build --no-cache
+	@docker-compose up -d --no-build

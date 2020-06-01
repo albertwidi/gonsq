@@ -2,9 +2,9 @@
 
 **Work In Progress**
 
-Gonsq is a wrapper of [go-nsq](https://github.com/nsqio/go-nsq) library
+Gonsq is a wrapper of [go-nsq](https://github.com/nsqio/go-nsq) library.
 
-The library inspired by how [Lyft Building an Adaptive, Multi-Tenant Stream Bus with Kafka and Golang](https://eng.lyft.com/building-an-adaptive-multi-tenant-stream-bus-with-kafka-and-golang-5f1410bf2b40) and [Flow Control architecture in envoy proxy](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md).
+This library is inspired by how [Lyft Building an Adaptive, Multi-Tenant Stream Bus with Kafka and Golang](https://eng.lyft.com/building-an-adaptive-multi-tenant-stream-bus-with-kafka-and-golang-5f1410bf2b40) and [Flow Control architecture in envoy proxy](https://github.com/envoyproxy/envoy/blob/master/source/docs/flow_control.md).
 
 ## Nsqio
 
@@ -14,33 +14,9 @@ Some properties also added to the `NSQConsumer` object, for example `concurrency
 
 ## Design
 
-The library flow control is based on buffered channel for each `topic` and `channel`. This means every consumer for different `topic` and `channel` might has different size of buffered channel and number of concurrency.
+Gonsq implements its own flow control on top of `go-nsq` library by using `buffered channel. The messages that delivered to buffered channels, then consumed by internal `gonsq-handler` which run using goroutines. This mechanism gives gonsq a way to communicate with each concurrent handlers to be able to control the queue flow.
 
-The worker model will replace `ConcurrenHandler` for handling multiple message concurrently. This is because the library want to control the flow of the message by using buffered channel as the main communication channel for worker.
-
-![nsq throttling design](../../docs/images/nsq_throttle_design.png)
-
-## Throttling 
-
-By design, the `handler` that registered by this library is not directly exposed to the `consumer handler`. This means the `handler` not directly asking for message from `nsq`.
-
-The message is being sent into the `handler` from a go channel that is dedicated for specific `topic` and `channel`, and the message can be consumed from that go channel only. By using this mechanism, the rate of message consumed by the `concurrent handler` can be controlled when something wrong happened.
-
-**Message Retrieval Throttling**
-
-This throttling is on by default.
-
-The message retrieval is throttled when the number of message in the `channel` is more than half of its size.
-
-For example, if the length of buffer is 10, and the message already exceeding 5. The consumer will pause the message consumption until the number of message in the buffer is going back to less than half of the buffer.
-
-**Message Processing Throttling**
-
-This throttling can be enabled by using `Throttling` middleware
-
-The message processing is throttled when the number of message in the `channel` is mor ethan half of its size.
-
-For example if the length of buffer is 10, and the message already exceeding 5. The consumer will slow down the message processing, this throttling is being handled by the `Throttling` middleware in this library. If the throttle middleware is set, then the library will seek `throttled` status in the message.
+![gonsq-design](./docs/images/gonsq-design.png)
 
 ## Stats
 

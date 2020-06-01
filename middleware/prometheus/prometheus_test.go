@@ -3,37 +3,32 @@ package prometheus
 import (
 	"errors"
 	"testing"
-
-	"github.com/prometheus/client_golang/prometheus"
 )
 
-// Every new metrics need to be tested for type casting.
-// Because we use prometheus.Collector as the map value type.
-func TestMetricsTypeCasting(t *testing.T) {
-	err := errors.New("metrics: wrong type")
+func TestMetricsList(t *testing.T) {
+	err := errors.New("metrics: got nil")
 
-	if _, ok := metrics[_nsqMessageRetrievedCount].(*prometheus.CounterVec); !ok {
+	// Count metrics.
+	if m := countMetrics[_nsqMessageRetrievedCount]; m == nil {
 		t.Fatal(err)
 	}
-	if _, ok := metrics[_nsqHandleCount].(*prometheus.CounterVec); !ok {
+	if m := countMetrics[_nsqHandleCount]; m == nil {
 		t.Fatal(err)
 	}
-	if _, ok := metrics[_nsqHandleDurationHist].(*prometheus.HistogramVec); !ok {
-		t.Fatal(err)
-	}
-	if _, ok := metrics[_nsqWorkerCurrentGauge].(*prometheus.GaugeVec); !ok {
-		t.Fatal(err)
-	}
-	if _, ok := metrics[_nsqThrottleGauge].(*prometheus.GaugeVec); !ok {
-		t.Fatal(err)
-	}
-	if _, ok := metrics[_nsqMessageInBuffGauge].(*prometheus.GaugeVec); !ok {
-		t.Fatal(err)
-	}
-}
 
-func TestRegisterMetrics(t *testing.T) {
-	if err := registerMetrics(); err != nil {
+	// Hist metrics.
+	if m := histMetrics[_nsqHandleDurationHist]; m == nil {
+		t.Fatal(err)
+	}
+
+	// Gauge metrics.
+	if m := gaugeMetrics[_nsqWorkerCurrentGauge]; m == nil {
+		t.Fatal(err)
+	}
+	if m := gaugeMetrics[_nsqThrottleGauge]; m == nil {
+		t.Fatal(err)
+	}
+	if m := gaugeMetrics[_nsqMessageInBuffGauge]; m == nil {
 		t.Fatal(err)
 	}
 }

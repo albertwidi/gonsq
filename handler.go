@@ -89,7 +89,7 @@ func (nh *nsqHandler) HandleMessage(message *gonsq.Message) error {
 			// The default throttling here won't affect the message consumer because messages already buffered
 			// but will have some effect for the nsqd itself because we pause the message consumption from nsqd.
 			time.Sleep(time.Second * 1)
-			if int(nh.stats.MessageInBuffer()) <= (nh.stats.BufferLength() / 2) {
+			if int(nh.stats.MessageInBuffer()) < (nh.stats.BufferLength() / 2) {
 				// Resume the message consumption to NSQD by set the MaxInFlight to buffer size.
 				nh.consumerBackend.ChangeMaxInFlight(int(nh.stats.BufferLength()))
 				nh.stats.setThrottle(false)

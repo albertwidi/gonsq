@@ -151,7 +151,7 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 		gonsqHandler: &gonsqHandler{
 			topic:       topic,
 			channel:     channel,
-			messageBuff: make(chan *Message, 1),
+			messageBuff: make(chan *Message, 2),
 			stats:       stats,
 		},
 		// Using buffered channel with length 1,
@@ -159,6 +159,7 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 		// and sending the message to this channel will block.
 		consumerBackend: backend,
 	}
+	stats.setBufferLength(cap(df.messageBuff))
 
 	nsqMessage := &gonsq.Message{
 		Body:     messageBody,
@@ -184,7 +185,6 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 	}
 }
 
-// TODO(albert) this test is flaky, fix it
 func TestNSQHandlerThrottle(t *testing.T) {
 	var (
 		topic   = "random"
@@ -202,6 +202,7 @@ func TestNSQHandlerThrottle(t *testing.T) {
 		},
 		consumerBackend: backend,
 	}
+	stats.setBufferLength(cap(df.messageBuff))
 	doneChan := make(chan struct{})
 
 	// TODO(albert) change the static number for limiter to dynamic

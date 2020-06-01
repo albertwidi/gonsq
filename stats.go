@@ -3,17 +3,18 @@
 // Worker Stats
 //
 // In the worker stats, statuses only shared within the worker. The worker is managed by a nsqHandler
-// that control the flow of the mssage from NSQ to the internal handler inside worker. The global stats pointer
-// will be included into all worker stats object. This is because we will pass the stats into the message,
-// so the worker stats will also have the information of global stats. This is useful for creating a middleware
-// where stats information is needed to be evaluated or throwed somewhere else.
+// to control the flow of the mssage from NSQ to the internal handler, inside the worker. The global stats pointer
+// will be included into all worker stats object. This is because each worker will pass the stats into the message,
+// so the handler will also have the information of current nsq stats. This is useful for creating a middleware
+// where stats information is needed for evaluation or throwing the stats to somewhere else.
 // These following items are inside the Worker Stats:
 //
 // - total_message_count
 // - total_error_count
 // - total_message_in_buffer_count
 // - total_buffer_length
-// - throttled
+// - throttle
+// - throttle_count
 // - total_concurrency_count
 // - current_worker_count
 
@@ -23,7 +24,7 @@ import (
 	"sync/atomic"
 )
 
-// statsb is a boolean type for throttle status.
+// statsb is a boolean type for stats.
 type statsb bool
 
 // Int return int value of throttle status
@@ -62,6 +63,8 @@ type Stats struct {
 	worker int64
 	// Throttle is the status of throttle, true means throttle is on.
 	throttle statsb
+	// Throttle count is the total count of throttle happened.
+	throttleCount int64
 	// Concurrency is the number of concurrency intended for the consumer.
 	concurrency int
 	maxInFlight int
@@ -139,4 +142,13 @@ func (s *Stats) setThrottle(b bool) statsb {
 // Throttle return whether the consumer/producer is being throttled or not.
 func (s *Stats) Throttle() statsb {
 	return s.throttle
+}
+
+func (s *Stats) addThrottleCount(n int64) int64 {
+	return atomic.AddInt64(&s.throttleCount, n)
+}
+
+// ThrottleCount return the total number of throttle happened.
+func (s *Stats) ThrottleCount() int64 {
+	return s.throttleCount
 }

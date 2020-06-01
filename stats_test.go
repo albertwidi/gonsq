@@ -82,6 +82,26 @@ func TestStatsThrottle(t *testing.T) {
 	}
 }
 
+func TestThrottleCount(t *testing.T) {
+	counts := []int64{
+		1, 2, 3, 4, 10, 100, 1000, 20000,
+	}
+
+	s := Stats{}
+
+	var counter int64
+	for _, count := range counts {
+		counter += count
+		result := s.addThrottleCount(count)
+
+		currentThrottleCount := s.ThrottleCount()
+
+		if result != counter && result != currentThrottleCount {
+			t.Fatalf("expecting counter of %d but got %d", counter, currentThrottleCount)
+		}
+	}
+}
+
 func TestStatsWorker(t *testing.T) {
 	x := 10
 	s := Stats{}

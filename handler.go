@@ -80,9 +80,13 @@ func (nh *nsqHandler) HandleMessage(message *gonsq.Message) error {
 	// and wait for the buffer to be consumed first.
 	if int(nh.stats.MessageInBuffer()) >= (nh.stats.BufferLength() / 2) {
 		// Set the handler throttle to true, so all message will be throttled right away.
+		// This should give signal to all handler to start the throttle mechanism, if
+		// the throttle middleware is activated.
 		nh.stats.setThrottle(true)
 		// Pause the message consumption to NSQD by set the MaxInFlight to 0.
 		nh.consumerBackend.ChangeMaxInFlight(0)
+		// Add the number of throttle count.
+		nh.stats.addThrottleCount(1)
 		for {
 			// Sleep every one second to check whether the message number is already decreased in the buffer,
 			// it might be better to have a lower evaluation interval, but need some metrics first.

@@ -19,7 +19,9 @@ var (
 	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
 )
 
-// ProducerBackend for NSQ
+// ProducerBackend is the producer client of NSQ.
+// This backend implements all communication protocol
+// to nsqd servers.
 type ProducerBackend interface {
 	Ping() error
 	Publish(topic string, body []byte) error
@@ -27,7 +29,9 @@ type ProducerBackend interface {
 	Stop()
 }
 
-// ConsumerBackend for NSQ
+// ConsumerBackend is he consumer client of NSQ.
+// This backend implements all communication protocol
+// to lookupd and nsqd servers.
 type ConsumerBackend interface {
 	Topic() string
 	Channel() string
@@ -40,7 +44,9 @@ type ConsumerBackend interface {
 	MaxInFlight() int
 }
 
-// ProducerManager for nsq
+// ProducerManager manage the producer flow. If a
+// given topic is not available in the manager,
+// the producer will return a failure message.
 type ProducerManager struct {
 	producer ProducerBackend
 	topics   map[string]bool
@@ -61,7 +67,7 @@ func WrapProducer(backend ProducerBackend, topics ...string) (*ProducerManager, 
 	return &p, nil
 }
 
-// Publish message to nsqd
+// Publish message to nsqd, if a given topic does not exists, then return error.
 func (p *ProducerManager) Publish(topic string, body []byte) error {
 	if ok := p.topics[topic]; !ok {
 		return errors.New("nsq: topic is not allowed to be published by this producer")
@@ -69,7 +75,7 @@ func (p *ProducerManager) Publish(topic string, body []byte) error {
 	return p.producer.Publish(topic, body)
 }
 
-// MultiPublish message to nsqd
+// MultiPublish message to nsqd, ifa given topic does not exists, then return error.
 func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
 	if ok := p.topics[topic]; !ok {
 		return errors.New("nsq: topic is not allowed to be published by this producer")
@@ -77,7 +83,10 @@ func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
 	return p.producer.MultiPublish(topic, body)
 }
 
-// ConsumerManager for nsq
+// ConsumerManager manage the consumer flow control. The ConsumerManager manages
+// multiple nsq consumers client, and expose apis for message handler to handle
+// the incoming messages. The ConsumerManager also manage the lifecycle of the
+// nsq consumers client and the concurrent handlers(start and stop).
 type ConsumerManager struct {
 	lookupdsAddr []string
 	handlers     []*gonsqHandler
@@ -135,16 +144,15 @@ func (c *ConsumerManager) Backends() map[string]map[string]bool {
 	return m
 }
 
-// Use the middleware
-// use should be called before handle function
+// Use middleware, this should be called before handle function
 // this function will avoid to add the same middleware twice
-// if the same middleware is used, it will skip the addition
+// if the same middleware is used, it will skip the addition.
 func (c *ConsumerManager) Use(middleware ...MiddlewareFunc) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// check whether the middleware is already exits
-	// if middleware already exist, avoid adding the middleware
+	// Check whether the middleware is already exits if the middleware
+	// already exist, avoid adding the middleware.
 	for _, m := range middleware {
 		found := false
 		for _, im := range c.middlewares {
@@ -175,14 +183,16 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 		channel: channel,
 		handler: handler,
 		stopC:   make(chan struct{}),
-		stats:   &Stats{},
+		// stats is allocated here, once. And will be shared
+		// into every concurrent gonsq handlers and messages.
+		stats: &Stats{},
 	}
 
-	// Only append this information if backend is found
-	// otherwise let the handler appended without this information.
-	// If backend is nil in this step, it will reproduce error when consumer start,
-	// this is because the name of backends will not detected in start state
-	// so its safe to skip the error here.
+	// Only append this information if backend is found, otherwise let
+	// the handler appended without this information.
+	// If backend is nil in this step, it will reproduce error when consumer
+	// is starting, this is because the name of backends will not be detected
+	// in start state. So its safe to skip the error here.
 	if backend != nil {
 		concurrency := backend.Concurrency()
 		maxInFlight := backend.MaxInFlight()
@@ -242,7 +252,7 @@ func (c *ConsumerManager) Start() error {
 		// Invoke all handler to work,
 		// depends on the number of concurrency.
 		for i := 0; i < handler.stats.Concurrency(); i++ {
-			handler.Work()
+			handler.Start()
 		}
 	}
 

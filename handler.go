@@ -34,11 +34,10 @@ type gonsqHandler struct {
 }
 
 // Work to handle nsq message
-func (gh *gonsqHandler) Work() {
-	// TODO: Might no longer need lock here as this already guarded by stats.
+func (gh *gonsqHandler) Start() {
 	gh.mu.Lock()
-	// Guard with lock,
-	// don't let worker number goes more than concurrency number.
+	// Guard with lock, don't let worker number
+	//  goes more than concurrency number.
 	if int(gh.stats.Worker()) == gh.stats.Concurrency() {
 		return
 	}

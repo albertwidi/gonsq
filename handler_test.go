@@ -117,7 +117,7 @@ func TestNSQHandlerConcurrencyControl(t *testing.T) {
 	}
 
 	for i := 1; i <= 5; i++ {
-		go handler.Work()
+		go handler.Start()
 		// Wait until the goroutines scheduled
 		// this might be too long, but its ok.
 		time.Sleep(time.Millisecond * 10)
@@ -157,7 +157,9 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 		// Using buffered channel with length 1,
 		// because in this test we don't listen the message using a worker,
 		// and sending the message to this channel will block.
-		consumerBackend: backend,
+		consumerBackend:   backend,
+		throttleFunc:      defaultThrottleFunc,
+		breakThrottleFunc: defaultBreakThrottleFunc,
 	}
 	stats.setBufferLength(cap(df.messageBuff))
 
@@ -200,7 +202,9 @@ func TestNSQHandlerThrottle(t *testing.T) {
 			messageBuff: make(chan *Message, 3),
 			stats:       stats,
 		},
-		consumerBackend: backend,
+		consumerBackend:   backend,
+		throttleFunc:      defaultThrottleFunc,
+		breakThrottleFunc: defaultBreakThrottleFunc,
 	}
 	stats.setBufferLength(cap(df.messageBuff))
 	doneChan := make(chan struct{})

@@ -86,6 +86,7 @@ type ConsumerManager struct {
 	mu       sync.RWMutex
 	backends map[string]map[string]ConsumerBackend
 
+	startMu sync.Mutex
 	started bool
 }
 
@@ -208,6 +209,13 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 
 // Start for start the consumer. This will trigger all workers to start.
 func (c *ConsumerManager) Start() error {
+	c.startMu.Lock()
+	defer c.startMu.Unlock()
+
+	if c.started {
+		return nil
+	}
+
 	for _, handler := range c.handlers {
 		backend, ok := c.backends[handler.topic][handler.channel]
 		if !ok {
@@ -218,6 +226,8 @@ func (c *ConsumerManager) Start() error {
 		dh := nsqHandler{
 			handler,
 			backend,
+			defaultThrottleFunc,
+			defaultBreakThrottleFunc,
 		}
 		// ConsumerConcurrency for consuming message from NSQ.
 		// Most of the time we don't need consumerConcurrency because consuming message from NSQ is very fast,
@@ -235,6 +245,7 @@ func (c *ConsumerManager) Start() error {
 			handler.Work()
 		}
 	}
+
 	c.started = true
 	return nil
 }
@@ -246,6 +257,17 @@ func (c *ConsumerManager) Started() bool {
 
 // Stop for stopping all the nsq consumer.
 func (c *ConsumerManager) Stop() error {
+	if len(c.backends) == 0 && len(c.handlers) == 0 {
+		return nil
+	}
+
+	c.startMu.Lock()
+	defer c.startMu.Unlock()
+
+	if !c.started {
+		return nil
+	}
+
 	// Stopping all NSQ backends. This should make message consumption to nsqHandler stop.
 	for _, channels := range c.backends {
 		for _, backend := range channels {
@@ -266,4 +288,23 @@ func (c *ConsumerManager) Stop() error {
 	}
 	c.started = false
 	return nil
+}
+
+func defaultThrottleFunc(stats *Stats) bool {
+	// Message in the buffer should always less than bufferLength/2
+	// if its already more than half of the buffer size, we should pause the consumption
+	// and wait for the buffer to be consumed first.
+	if int(stats.MessageInBuffer()) >= (stats.BufferLength() / 2) {
+		return true
+	}
+	return false
+}
+
+func defaultBreakThrottleFunc(stats *Stats) bool {
+	// Release the throttle status when message is already reduced to less
+	// than half of buffer size.
+	if int(stats.MessageInBuffer()) < (stats.BufferLength() / 2) {
+		return true
+	}
+	return false
 }

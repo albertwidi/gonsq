@@ -2,6 +2,7 @@ package prometheus
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	nsq "github.com/albertwidi/gonsq"
@@ -18,13 +19,14 @@ const (
 )
 
 var (
-	countMetrics = []*prometheus.CounterVec{_nsqMessageRetrievedCount: prometheus.NewCounterVec(
-		prometheus.CounterOpts{
-			Name: "nsq_message_retrieved_total",
-			Help: "total message being retrieved from nsq for certain topic and channel, retrieved doesn't mean it is been processed",
-		},
-		[]string{"topic", "channel"},
-	),
+	countMetrics = []*prometheus.CounterVec{
+		_nsqMessageRetrievedCount: prometheus.NewCounterVec(
+			prometheus.CounterOpts{
+				Name: "nsq_message_retrieved_total",
+				Help: "total message being retrieved from nsq for certain topic and channel, retrieved doesn't mean it is been processed",
+			},
+			[]string{"topic", "channel"},
+		),
 		_nsqHandleCount: prometheus.NewCounterVec(
 			prometheus.CounterOpts{
 				Name: "nsq_handle_error_total",
@@ -37,6 +39,7 @@ var (
 		_nsqHandleDurationHist: prometheus.NewHistogramVec(
 			prometheus.HistogramOpts{
 				Name: "nsq_message_handle_duration",
+				Help: "Handle duration of nsq message per topic and channel",
 			}, []string{"topic", "channel"},
 		),
 	}
@@ -59,16 +62,32 @@ var (
 	}
 )
 
+var once sync.Once
+var must = func() {
+	for idx := range countMetrics {
+		if countMetrics[idx] == nil {
+			continue
+		}
+		prometheus.MustRegister(countMetrics[idx])
+	}
+
+	for idx := range histMetrics {
+		if histMetrics[idx] == nil {
+			continue
+		}
+		prometheus.MustRegister(histMetrics[idx])
+	}
+
+	for idx := range gaugeMetrics {
+		if gaugeMetrics[idx] == nil {
+			continue
+		}
+		prometheus.MustRegister(gaugeMetrics[idx])
+	}
+}
+
 func init() {
-	for _, countM := range countMetrics {
-		prometheus.MustRegister(countM)
-	}
-	for _, histM := range histMetrics {
-		prometheus.MustRegister(histM)
-	}
-	for _, gaugeM := range gaugeMetrics {
-		prometheus.MustRegister(gaugeM)
-	}
+	once.Do(must)
 }
 
 // Metrics middleware for nsq

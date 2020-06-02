@@ -39,7 +39,7 @@ func TestThrottleMiddleware(t *testing.T) {
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 	publisher := fake.NewProducer()
 
-	wc, err := gonsq.WrapConsumers([]string{"testing"}, consumer)
+	wc, err := gonsq.ManageConsumers([]string{"testing"}, consumer)
 	if err != nil {
 		t.Error(err)
 		return

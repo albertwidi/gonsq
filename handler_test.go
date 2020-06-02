@@ -60,7 +60,7 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		fake := fakensq.New()
 		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: c.concurrency, MaxInFlight: c.buffMultiplier})
 
-		wc, err := WrapConsumers([]string{"testing"}, consumer)
+		wc, err := ManageConsumers([]string{"testing"}, consumer)
 		if !errors.Is(err, c.expectError) {
 			t.Errorf("expecting error %v but got %v", c.expectError, err)
 			return
@@ -103,7 +103,7 @@ func TestNSQHandlerConcurrencyControl(t *testing.T) {
 	fake := fakensq.New()
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 
-	wc, err := WrapConsumers([]string{"testing"}, consumer)
+	wc, err := ManageConsumers([]string{"testing"}, consumer)
 	if err != nil {
 		t.Error(err)
 		return
@@ -157,7 +157,7 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 		// Using buffered channel with length 1,
 		// because in this test we don't listen the message using a worker,
 		// and sending the message to this channel will block.
-		consumerBackend:   backend,
+		client:            backend,
 		throttleFunc:      defaultThrottleFunc,
 		breakThrottleFunc: defaultBreakThrottleFunc,
 	}
@@ -202,7 +202,7 @@ func TestNSQHandlerThrottle(t *testing.T) {
 			messageBuff: make(chan *Message, 3),
 			stats:       stats,
 		},
-		consumerBackend:   backend,
+		client:            backend,
 		throttleFunc:      defaultThrottleFunc,
 		breakThrottleFunc: defaultBreakThrottleFunc,
 	}

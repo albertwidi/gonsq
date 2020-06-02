@@ -67,7 +67,7 @@ func (gh *gonsqHandler) Stop() {
 // HandleMessage function.
 type nsqHandler struct {
 	*gonsqHandler
-	consumerBackend ConsumerBackend
+	client ConsumerClient
 
 	// throttleFunc is invoked in every message consumption
 	// to determine if a throttle condition needs to happen
@@ -89,7 +89,7 @@ func (nh *nsqHandler) HandleMessage(message *gonsq.Message) error {
 		// the throttle middleware is activated.
 		nh.stats.setThrottle(true)
 		// Pause the message consumption to NSQD by set the MaxInFlight to 0.
-		nh.consumerBackend.ChangeMaxInFlight(0)
+		nh.client.ChangeMaxInFlight(0)
 		// Add the number of throttle count.
 		nh.stats.addThrottleCount(1)
 		for {
@@ -100,7 +100,7 @@ func (nh *nsqHandler) HandleMessage(message *gonsq.Message) error {
 			time.Sleep(time.Second * 1)
 			if nh.breakThrottleFunc(nh.stats) {
 				// Resume the message consumption to NSQD by set the MaxInFlight to buffer size.
-				nh.consumerBackend.ChangeMaxInFlight(int(nh.stats.BufferLength()))
+				nh.client.ChangeMaxInFlight(int(nh.stats.BufferLength()))
 				nh.stats.setThrottle(false)
 				break
 			}

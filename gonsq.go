@@ -19,20 +19,20 @@ var (
 	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
 )
 
-// ProducerBackend is the producer client of NSQ.
+// ProducerClient is the producer client of NSQ.
 // This backend implements all communication protocol
 // to nsqd servers.
-type ProducerBackend interface {
+type ProducerClient interface {
 	Ping() error
 	Publish(topic string, body []byte) error
 	MultiPublish(topic string, body [][]byte) error
 	Stop()
 }
 
-// ConsumerBackend is he consumer client of NSQ.
+// ConsumerClient is he consumer client of NSQ.
 // This backend implements all communication protocol
 // to lookupd and nsqd servers.
-type ConsumerBackend interface {
+type ConsumerClient interface {
 	Topic() string
 	Channel() string
 	Stop()
@@ -48,15 +48,15 @@ type ConsumerBackend interface {
 // given topic is not available in the manager,
 // the producer will return a failure message.
 type ProducerManager struct {
-	producer ProducerBackend
+	producer ProducerClient
 	topics   map[string]bool
 }
 
-// WrapProducer is a function to wrap the nsq producer.
+// ManageProducers is a function to wrap the nsq producer.
 // The function receive topics parameters because in NSQ, we can publish message
 // without registering any new topics. This sometimes can be problematic as
 // we don't have a list of topics that we will publish the message to.
-func WrapProducer(backend ProducerBackend, topics ...string) (*ProducerManager, error) {
+func ManageProducers(backend ProducerClient, topics ...string) (*ProducerManager, error) {
 	p := ProducerManager{
 		producer: backend,
 		topics:   make(map[string]bool),
@@ -92,29 +92,29 @@ type ConsumerManager struct {
 	handlers     []*gonsqHandler
 	middlewares  []MiddlewareFunc
 
-	mu       sync.RWMutex
-	backends map[string]map[string]ConsumerBackend
+	mu      sync.RWMutex
+	clients map[string]map[string]ConsumerClient
 
 	startMu sync.Mutex
 	started bool
 }
 
-// WrapConsumers of gonsq
-func WrapConsumers(lookupdsAddr []string, backends ...ConsumerBackend) (*ConsumerManager, error) {
+// ManageConsumers creates a new ConsumerManager
+func ManageConsumers(lookupdsAddr []string, clients ...ConsumerClient) (*ConsumerManager, error) {
 	if lookupdsAddr == nil {
 		return nil, ErrLookupdsAddrEmpty
 	}
 
 	c := ConsumerManager{
 		lookupdsAddr: lookupdsAddr,
-		backends:     make(map[string]map[string]ConsumerBackend),
+		clients:      make(map[string]map[string]ConsumerClient),
 	}
-	return &c, c.AddConsumers(backends...)
+	return &c, c.AddConsumers(clients...)
 }
 
 // AddConsumers add more consumers to the consumer object.
-func (c *ConsumerManager) AddConsumers(backends ...ConsumerBackend) error {
-	for _, b := range backends {
+func (c *ConsumerManager) AddConsumers(clients ...ConsumerClient) error {
+	for _, b := range clients {
 		if b.Concurrency() <= 0 || b.MaxInFlight() <= 0 {
 			return fmt.Errorf("%w,concurrency: %d, maxInFlight: %d", ErrInvalidConcurrencyConfiguration, b.Concurrency(), b.MaxInFlight())
 		}
@@ -122,10 +122,10 @@ func (c *ConsumerManager) AddConsumers(backends ...ConsumerBackend) error {
 		topic := b.Topic()
 		channel := b.Channel()
 
-		if c.backends[topic] == nil {
-			c.backends[topic] = make(map[string]ConsumerBackend)
+		if c.clients[topic] == nil {
+			c.clients[topic] = make(map[string]ConsumerClient)
 		}
-		c.backends[topic][channel] = b
+		c.clients[topic][channel] = b
 	}
 	return nil
 }
@@ -133,7 +133,7 @@ func (c *ConsumerManager) AddConsumers(backends ...ConsumerBackend) error {
 // Backends return information regarding topic and channel that avaialbe
 func (c *ConsumerManager) Backends() map[string]map[string]bool {
 	m := map[string]map[string]bool{}
-	for topic, channels := range c.backends {
+	for topic, channels := range c.clients {
 		for channel := range channels {
 			if m[topic] == nil {
 				m[topic] = map[string]bool{}
@@ -176,7 +176,7 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 	for i := range c.middlewares {
 		handler = c.middlewares[len(c.middlewares)-i-1](handler)
 	}
-	backend := c.backends[topic][channel]
+	backend := c.clients[topic][channel]
 
 	h := &gonsqHandler{
 		topic:   topic,
@@ -191,7 +191,7 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 	// Only append this information if backend is found, otherwise let
 	// the handler appended without this information.
 	// If backend is nil in this step, it will reproduce error when consumer
-	// is starting, this is because the name of backends will not be detected
+	// is starting, this is because the name of clients will not be detected
 	// in start state. So its safe to skip the error here.
 	if backend != nil {
 		concurrency := backend.Concurrency()
@@ -227,7 +227,7 @@ func (c *ConsumerManager) Start() error {
 	}
 
 	for _, handler := range c.handlers {
-		backend, ok := c.backends[handler.topic][handler.channel]
+		backend, ok := c.clients[handler.topic][handler.channel]
 		if !ok {
 			return fmt.Errorf("nsq: backend with topoc %s and channel %s not found. error: %w", handler.topic, handler.channel, ErrTopicWithChannelNotFound)
 		}
@@ -267,7 +267,7 @@ func (c *ConsumerManager) Started() bool {
 
 // Stop for stopping all the nsq consumer.
 func (c *ConsumerManager) Stop() error {
-	if len(c.backends) == 0 && len(c.handlers) == 0 {
+	if len(c.clients) == 0 && len(c.handlers) == 0 {
 		return nil
 	}
 
@@ -278,8 +278,8 @@ func (c *ConsumerManager) Stop() error {
 		return nil
 	}
 
-	// Stopping all NSQ backends. This should make message consumption to nsqHandler stop.
-	for _, channels := range c.backends {
+	// Stopping all NSQ clients. This should make message consumption to nsqHandler stop.
+	for _, channels := range c.clients {
 		for _, backend := range channels {
 			backend.Stop()
 		}

@@ -24,5 +24,5 @@ func New(ctx context.Context, producer Producer, topic ...string) (*gonsq.Produc
 		return nil, err
 	}
 
-	return gonsq.WrapProducer(p, topic...)
+	return gonsq.ManageProducers(p, topic...)
 }

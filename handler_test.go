@@ -157,9 +157,10 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 		// Using buffered channel with length 1,
 		// because in this test we don't listen the message using a worker,
 		// and sending the message to this channel will block.
-		client:            backend,
-		throttleFunc:      defaultThrottleFunc,
-		breakThrottleFunc: defaultBreakThrottleFunc,
+		client:             backend,
+		openThrottleFunc:   defaultOpenThrottleFunc,
+		loosenThrottleFunc: defaultLoosenThrottleFunc,
+		breakThrottleFunc:  defaultBreakThrottleFunc,
 	}
 	stats.setBufferLength(cap(df.messageBuff))
 
@@ -202,9 +203,10 @@ func TestNSQHandlerThrottle(t *testing.T) {
 			messageBuff: make(chan *Message, 3),
 			stats:       stats,
 		},
-		client:            backend,
-		throttleFunc:      defaultThrottleFunc,
-		breakThrottleFunc: defaultBreakThrottleFunc,
+		client:             backend,
+		openThrottleFunc:   defaultOpenThrottleFunc,
+		loosenThrottleFunc: defaultLoosenThrottleFunc,
+		breakThrottleFunc:  defaultBreakThrottleFunc,
 	}
 	stats.setBufferLength(cap(df.messageBuff))
 	doneChan := make(chan struct{})

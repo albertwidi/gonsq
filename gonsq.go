@@ -236,7 +236,8 @@ func (c *ConsumerManager) Start() error {
 		dh := nsqHandler{
 			handler,
 			backend,
-			defaultThrottleFunc,
+			defaultOpenThrottleFunc,
+			defaultLoosenThrottleFunc,
 			defaultBreakThrottleFunc,
 		}
 		// ConsumerConcurrency for consuming message from NSQ.
@@ -300,13 +301,17 @@ func (c *ConsumerManager) Stop() error {
 	return nil
 }
 
-func defaultThrottleFunc(stats *Stats) bool {
+func defaultOpenThrottleFunc(stats *Stats) bool {
 	// Message in the buffer should always less than bufferLength/2
 	// if its already more than half of the buffer size, we should pause the consumption
 	// and wait for the buffer to be consumed first.
 	if int(stats.MessageInBuffer()) >= (stats.BufferLength() / 2) {
 		return true
 	}
+	return false
+}
+
+func defaultLoosenThrottleFunc(stats *Stats) bool {
 	return false
 }
 

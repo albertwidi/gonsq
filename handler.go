@@ -2,6 +2,7 @@ package gonsq
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"time"
 
@@ -34,27 +35,25 @@ type gonsqHandler struct {
 }
 
 // Work to handle nsq message
-func (gh *gonsqHandler) Start() {
+func (gh *gonsqHandler) Start() error {
 	gh.mu.Lock()
 	// Guard with lock, don't let worker number
 	//  goes more than concurrency number.
 	if int(gh.stats.Worker()) == gh.stats.Concurrency() {
-		return
+		return fmt.Errorf("already at maximum number of concurrency: %d", gh.stats.Concurrency())
 	}
 	gh.stats.addWorker(1)
 	gh.mu.Unlock()
 
-	go func() {
-		for {
-			select {
-			case <-gh.stopC:
-				return
-			case message := <-gh.messageBuff:
-				gh.handler(context.Background(), message)
-				gh.stats.addMessageInBuffCount(-1)
-			}
+	for {
+		select {
+		case <-gh.stopC:
+			return nil
+		case message := <-gh.messageBuff:
+			gh.handler(context.Background(), message)
+			gh.stats.addMessageInBuffCount(-1)
 		}
-	}()
+	}
 }
 
 // Stop the work of nsq handler

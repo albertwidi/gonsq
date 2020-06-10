@@ -10,6 +10,31 @@ import (
 	"github.com/albertwidi/gonsq/fakensq"
 )
 
+// helper function to start the consumer manager
+func startConsumer(t *testing.T, cm *ConsumerManager) error {
+	t.Helper()
+
+	var err error
+	errC := make(chan error)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	go func() {
+		if err := cm.Start(); err != nil {
+			errC <- err
+		}
+	}()
+
+	select {
+	case err = <-errC:
+		break
+	case <-ctx.Done():
+		break
+	}
+
+	return err
+}
+
 func TestStartStop(t *testing.T) {
 	var (
 		topic   = "test_topic"
@@ -24,7 +49,8 @@ func TestStartStop(t *testing.T) {
 		t.Error(err)
 		return
 	}
-	if err := wc.Start(); err != nil {
+
+	if err := startConsumer(t, wc); err != nil {
 		t.Error(err)
 		return
 	}
@@ -32,10 +58,12 @@ func TestStartStop(t *testing.T) {
 	// Give time for consumer to start the work.
 	time.Sleep(time.Millisecond * 100)
 
-	for _, h := range wc.handlers {
-		if h.stats.Worker() == 0 {
-			t.Error("worker number should not be 0 because consumer is started")
-			return
+	for _, channels := range wc.handlers {
+		for _, h := range channels {
+			if h.stats.Worker() == 0 {
+				t.Error("worker number should not be 0 because consumer is started")
+				return
+			}
 		}
 	}
 
@@ -47,10 +75,12 @@ func TestStartStop(t *testing.T) {
 	// Give time for consumer to stop the work.
 	time.Sleep(time.Millisecond * 100)
 
-	for _, h := range wc.handlers {
-		if h.stats.Worker() != 0 {
-			t.Error("worker number should be 0 because consumer is stopped")
-			return
+	for _, channels := range wc.handlers {
+		for _, h := range channels {
+			if h.stats.Worker() != 0 {
+				t.Error("worker number should be 0 because consumer is stopped")
+				return
+			}
 		}
 	}
 }
@@ -160,45 +190,35 @@ func TestGracefulStop(t *testing.T) {
 	}
 
 	topics := []struct {
-		topic   string
-		channel string
+		topic    string
+		channels []string
 	}{
 		{
 			"topic_1",
-			"topic_1_channel_1",
-		},
-		{
-			"topic_1",
-			"topic_1_channel_2",
-		},
-		{
-			"topic_1",
-			"topic_1_channel_3",
+			[]string{"channel_1", "channel_2", "channel_3"},
 		},
 		{
 			"topic_2",
-			"topic_2_channel_1",
-		},
-		{
-			"topic_2",
-			"topic_2_channel_2",
+			[]string{"channel_1", "channel_2"},
 		},
 	}
 
 	for _, topic := range topics {
-		// Use at least 60 buffer length(1*60) because 10 message is sent into 3 different channel this test, so we don't get any throttle.
-		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic.topic, Channel: topic.channel, Concurrency: 1, MaxInFlight: 60})
+		for _, channel := range topic.channels {
+			// Use buffer length 20 because 10 message is sent to all topics and channels.
+			config := fakensq.ConsumerConfig{Topic: topic.topic, Channel: channel, Concurrency: 1, MaxInFlight: 20}
+			consumer := fake.NewConsumer(config)
 
-		wc.AddConsumers(consumer)
-		handler := HandlerFunc(func(ctx context.Context, message *Message) error {
-			// Sleep for 0.2 sec for every message consumption
-			time.Sleep(time.Millisecond)
-			return nil
-		})
-		wc.Handle(topic.topic, topic.channel, handler)
+			wc.AddConsumers(consumer)
+			handler := HandlerFunc(func(ctx context.Context, message *Message) error {
+				time.Sleep(time.Millisecond)
+				return nil
+			})
+			wc.Handle(topic.topic, channel, handler)
+		}
 	}
 
-	if err := wc.Start(); err != nil {
+	if err := startConsumer(t, wc); err != nil {
 		t.Fatal(err)
 	}
 
@@ -225,9 +245,11 @@ func TestGracefulStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, handler := range wc.handlers {
-		if handler.stats.MessageInBuffer() != 0 {
-			t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.topic, handler.channel)
+	for _, channels := range wc.handlers {
+		for _, handler := range channels {
+			if handler.stats.MessageInBuffer() != 0 {
+				t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.topic, handler.channel)
+			}
 		}
 	}
 }

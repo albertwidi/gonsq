@@ -73,7 +73,7 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		// Trigger the creation of handler.
 		wc.Handle(topic, channel, nil)
 
-		handler := wc.handlers[0]
+		handler := wc.handlers[topic][channel]
 		if handler == nil {
 			t.Fatalf("handler should not be nil, as handle is triggered")
 		}
@@ -111,7 +111,7 @@ func TestNSQHandlerConcurrencyControl(t *testing.T) {
 	// Trigger the creation of handler.
 	wc.Handle(topic, channel, nil)
 
-	handler := wc.handlers[0]
+	handler := wc.handlers[topic][channel]
 	if handler == nil {
 		t.Error("handler should not be nil, as handle is triggered")
 	}

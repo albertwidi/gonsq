@@ -89,14 +89,16 @@ func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
 // nsq consumers client and the concurrent handlers(start and stop).
 type ConsumerManager struct {
 	lookupdsAddr []string
-	handlers     []*gonsqHandler
-	middlewares  []MiddlewareFunc
+	// Using map of topic and channel to make sure double handler registration is not possible.
+	handlers    map[string]map[string]*gonsqHandler
+	middlewares []MiddlewareFunc
 
 	mu      sync.RWMutex
 	clients map[string]map[string]ConsumerClient
 
 	startMu sync.Mutex
 	started bool
+	errC    chan error
 }
 
 // ManageConsumers creates a new ConsumerManager
@@ -107,7 +109,9 @@ func ManageConsumers(lookupdsAddr []string, clients ...ConsumerClient) (*Consume
 
 	c := ConsumerManager{
 		lookupdsAddr: lookupdsAddr,
+		handlers:     make(map[string]map[string]*gonsqHandler),
 		clients:      make(map[string]map[string]ConsumerClient),
+		errC:         make(chan error),
 	}
 	return &c, c.AddConsumers(clients...)
 }
@@ -128,20 +132,6 @@ func (c *ConsumerManager) AddConsumers(clients ...ConsumerClient) error {
 		c.clients[topic][channel] = b
 	}
 	return nil
-}
-
-// Backends return information regarding topic and channel that avaialbe
-func (c *ConsumerManager) Backends() map[string]map[string]bool {
-	m := map[string]map[string]bool{}
-	for topic, channels := range c.clients {
-		for channel := range channels {
-			if m[topic] == nil {
-				m[topic] = map[string]bool{}
-			}
-			m[topic][channel] = true
-		}
-	}
-	return m
 }
 
 // Use middleware, this should be called before handle function
@@ -214,51 +204,71 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 		h.stats.setMaxInFlight(maxInFlight)
 		h.stats.setBufferLength(buffLen)
 	}
-	c.handlers = append(c.handlers, h)
+
+	// Create a new map if map to the channels is not exist.
+	if c.handlers[topic] == nil {
+		c.handlers[topic] = make(map[string]*gonsqHandler)
+	}
+
+	if _, ok := c.handlers[topic][channel]; ok {
+		// Panic because this should not happen and will produce a weird behavior.
+		// TODO(albert) create test for panic behavior.
+		panic(fmt.Errorf("handler with topic %s and channel %s already exist", topic, channel))
+	}
+	c.handlers[topic][channel] = h
 }
 
 // Start for start the consumer. This will trigger all workers to start.
 func (c *ConsumerManager) Start() error {
 	c.startMu.Lock()
-	defer c.startMu.Unlock()
 
 	if c.started {
+		c.startMu.Unlock()
 		return nil
 	}
 
-	for _, handler := range c.handlers {
-		backend, ok := c.clients[handler.topic][handler.channel]
-		if !ok {
-			return fmt.Errorf("nsq: backend with topoc %s and channel %s not found. error: %w", handler.topic, handler.channel, ErrTopicWithChannelNotFound)
-		}
+	for _, channels := range c.handlers {
+		for _, handler := range channels {
+			backend, ok := c.clients[handler.topic][handler.channel]
+			if !ok {
+				return fmt.Errorf("nsq: backend with topoc %s and channel %s not found. error: %w", handler.topic, handler.channel, ErrTopicWithChannelNotFound)
+			}
 
-		// Create a default handler for consuming message directly from nsq handler.
-		dh := nsqHandler{
-			handler,
-			backend,
-			defaultOpenThrottleFunc,
-			defaultLoosenThrottleFunc,
-			defaultBreakThrottleFunc,
-		}
-		// ConsumerConcurrency for consuming message from NSQ.
-		// Most of the time we don't need consumerConcurrency because consuming message from NSQ is very fast,
-		// the handler or the true consumer might need time to handle the message.
-		backend.AddHandler(&dh)
-		// Change the MaxInFlight to buffLength as the number of message won't exceed the buffLength.
-		backend.ChangeMaxInFlight(dh.stats.BufferLength())
+			// Create a default handler for consuming message directly from nsq handler.
+			dh := nsqHandler{
+				handler,
+				backend,
+				defaultOpenThrottleFunc,
+				defaultLoosenThrottleFunc,
+				defaultBreakThrottleFunc,
+			}
+			// ConsumerConcurrency for consuming message from NSQ.
+			// Most of the time we don't need consumerConcurrency because consuming message from NSQ is very fast,
+			// the handler or the true consumer might need time to handle the message.
+			backend.AddHandler(&dh)
+			// Change the MaxInFlight to buffLength as the number of message won't exceed the buffLength.
+			backend.ChangeMaxInFlight(dh.stats.BufferLength())
 
-		if err := backend.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
-			return err
-		}
-		// Invoke all handler to work,
-		// depends on the number of concurrency.
-		for i := 0; i < handler.stats.Concurrency(); i++ {
-			handler.Start()
+			if err := backend.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
+				return err
+			}
+			// Invoke all handler to work,
+			// depends on the number of concurrency.
+			for i := 0; i < handler.stats.Concurrency(); i++ {
+				go func(handler *gonsqHandler) {
+					err := handler.Start()
+					if err != nil {
+						c.errC <- err
+					}
+				}(handler)
+			}
 		}
 	}
 
 	c.started = true
-	return nil
+	c.startMu.Unlock()
+
+	return <-c.errC
 }
 
 // Started return the status of the consumer, whether the consumer started or not.
@@ -285,19 +295,25 @@ func (c *ConsumerManager) Stop() error {
 			backend.Stop()
 		}
 	}
-	for _, handler := range c.handlers {
-		// Wait until all messages consumed, stopping gracefully.
-		for handler.stats.MessageInBuffer() != 0 {
-			time.Sleep(time.Millisecond * 300)
-		}
-		// Stop all the handler worker based on concurrency number
-		// this step is expected to be blocking,
-		// wait until all worker is exited.
-		for i := 0; i < handler.stats.Concurrency(); i++ {
-			handler.Stop()
+	for _, channels := range c.handlers {
+		for _, handler := range channels {
+			// Wait until all messages consumed, stopping gracefully.
+			for handler.stats.MessageInBuffer() != 0 {
+				time.Sleep(time.Millisecond * 300)
+			}
+			// Stop all the handler worker based on concurrency number
+			// this step is expected to be blocking,
+			// wait until all worker is exited.
+			for i := 0; i < handler.stats.Concurrency(); i++ {
+				handler.Stop()
+			}
 		}
 	}
+
+	// Make the start function to return.
+	close(c.errC)
 	c.started = false
+
 	return nil
 }
 

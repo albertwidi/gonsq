@@ -21,6 +21,7 @@
 package gonsq
 
 import (
+	"sync"
 	"sync/atomic"
 )
 
@@ -62,7 +63,8 @@ type Stats struct {
 	// Worker is the current number of message processing worker.
 	worker int64
 	// Throttle is the status of throttle, true means throttle is on.
-	throttle statsb
+	throttleMu sync.RWMutex
+	throttle   statsb
 	// Throttle count is the total count of throttle happened.
 	throttleCount int64
 	// Concurrency is the number of concurrency intended for the consumer.
@@ -135,12 +137,16 @@ func (s *Stats) Worker() int64 {
 }
 
 func (s *Stats) setThrottle(b bool) statsb {
+	s.throttleMu.Lock()
+	defer s.throttleMu.Unlock()
 	s.throttle = statsb(b)
 	return s.throttle
 }
 
 // Throttle return whether the consumer/producer is being throttled or not.
 func (s *Stats) Throttle() statsb {
+	s.throttleMu.RLock()
+	s.throttleMu.RUnlock()
 	return s.throttle
 }
 

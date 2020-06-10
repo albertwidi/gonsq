@@ -279,6 +279,7 @@ func NewConsumer(ctx context.Context, config NSQConsumerConfig) (*NSQConsumer, e
 	if err != nil {
 		return nil, err
 	}
+
 	con, err := nsqio.NewConsumer(config.Topic, config.Channel, nsqioConfig)
 	if err != nil {
 		return nil, err

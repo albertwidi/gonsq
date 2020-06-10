@@ -159,7 +159,7 @@ func TestMiddlewareChaining(t *testing.T) {
 		return err
 	})
 
-	if err := wc.Start(); err != nil {
+	if err := startConsumer(t, wc); err != nil {
 		t.Error(err)
 		return
 	}

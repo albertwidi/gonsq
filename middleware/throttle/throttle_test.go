@@ -12,6 +12,31 @@ import (
 	fakensq "github.com/albertwidi/gonsq/fakensq"
 )
 
+// helper function to start the consumer manager
+func startConsumer(t *testing.T, cm *gonsq.ConsumerManager) error {
+	t.Helper()
+
+	var err error
+	errC := make(chan error)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	defer cancel()
+
+	go func() {
+		if err := cm.Start(); err != nil {
+			errC <- err
+		}
+	}()
+
+	select {
+	case err = <-errC:
+		break
+	case <-ctx.Done():
+		break
+	}
+
+	return err
+}
+
 func TestThrottleMiddleware(t *testing.T) {
 	var (
 		topic                 = "test_topic"
@@ -100,7 +125,7 @@ func TestThrottleMiddleware(t *testing.T) {
 		return err
 	})
 
-	if err := wc.Start(); err != nil {
+	if err := startConsumer(t, wc); err != nil {
 		t.Error(err)
 		return
 	}

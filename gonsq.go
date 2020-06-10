@@ -227,9 +227,11 @@ func (c *ConsumerManager) Start() error {
 		return nil
 	}
 
+	var clients []ConsumerClient
+
 	for _, channels := range c.handlers {
 		for _, handler := range channels {
-			backend, ok := c.clients[handler.topic][handler.channel]
+			client, ok := c.clients[handler.topic][handler.channel]
 			if !ok {
 				return fmt.Errorf("nsq: backend with topoc %s and channel %s not found. error: %w", handler.topic, handler.channel, ErrTopicWithChannelNotFound)
 			}
@@ -237,7 +239,7 @@ func (c *ConsumerManager) Start() error {
 			// Create a default handler for consuming message directly from nsq handler.
 			dh := nsqHandler{
 				handler,
-				backend,
+				client,
 				defaultOpenThrottleFunc,
 				defaultLoosenThrottleFunc,
 				defaultBreakThrottleFunc,
@@ -245,13 +247,10 @@ func (c *ConsumerManager) Start() error {
 			// ConsumerConcurrency for consuming message from NSQ.
 			// Most of the time we don't need consumerConcurrency because consuming message from NSQ is very fast,
 			// the handler or the true consumer might need time to handle the message.
-			backend.AddHandler(&dh)
+			client.AddHandler(&dh)
 			// Change the MaxInFlight to buffLength as the number of message won't exceed the buffLength.
-			backend.ChangeMaxInFlight(dh.stats.BufferLength())
+			client.ChangeMaxInFlight(dh.stats.BufferLength())
 
-			if err := backend.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
-				return err
-			}
 			// Invoke all handler to work,
 			// depends on the number of concurrency.
 			for i := 0; i < handler.stats.Concurrency(); i++ {
@@ -262,9 +261,21 @@ func (c *ConsumerManager) Start() error {
 					}
 				}(handler)
 			}
+
+			clients = append(clients, client)
 		}
 	}
 
+	// Connect to all NSQLookupds.
+	for _, client := range clients {
+		go func(client ConsumerClient) {
+			if err := client.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
+				c.errC <- fmt.Errorf("gonsq: topoic: %s channel: %s error connecting to lookupds: %v. Error: %v", client.Topic(), client.Channel(), c.lookupdsAddr, err)
+			}
+		}(client)
+	}
+
+	clients = nil
 	c.started = true
 	c.startMu.Unlock()
 

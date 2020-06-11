@@ -58,12 +58,10 @@ func TestStartStop(t *testing.T) {
 	// Give time for consumer to start the work.
 	time.Sleep(time.Millisecond * 100)
 
-	for _, channels := range wc.handlers {
-		for _, h := range channels {
-			if h.stats.Worker() == 0 {
-				t.Error("worker number should not be 0 because consumer is started")
-				return
-			}
+	for _, h := range wc.handlers {
+		if h.stats.Worker() == 0 {
+			t.Error("worker number should not be 0 because consumer is started")
+			return
 		}
 	}
 
@@ -75,12 +73,10 @@ func TestStartStop(t *testing.T) {
 	// Give time for consumer to stop the work.
 	time.Sleep(time.Millisecond * 100)
 
-	for _, channels := range wc.handlers {
-		for _, h := range channels {
-			if h.stats.Worker() != 0 {
-				t.Error("worker number should be 0 because consumer is stopped")
-				return
-			}
+	for _, h := range wc.handlers {
+		if h.stats.Worker() != 0 {
+			t.Error("worker number should be 0 because consumer is stopped")
+			return
 		}
 	}
 }
@@ -245,11 +241,9 @@ func TestGracefulStop(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	for _, channels := range wc.handlers {
-		for _, handler := range channels {
-			if handler.stats.MessageInBuffer() != 0 {
-				t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.topic, handler.channel)
-			}
+	for _, handler := range wc.handlers {
+		if handler.stats.MessageInBuffer() != 0 {
+			t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.topic, handler.channel)
 		}
 	}
 }

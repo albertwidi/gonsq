@@ -50,7 +50,13 @@ func (gh *gonsqHandler) Start() error {
 		case <-gh.stopC:
 			return nil
 		case message := <-gh.messageBuff:
-			gh.handler(context.Background(), message)
+			if err := gh.handler(context.Background(), message); err != nil {
+				gh.stats.addErrorCount(1)
+			}
+			// The message in buffer count is reduced after the handler finished,
+			// this means the count in buffer is going down slower. This have
+			// effect for throttling, because the throttling mechanism rely on
+			// the total count of message in buffer.
 			gh.stats.addMessageInBuffCount(-1)
 		}
 	}

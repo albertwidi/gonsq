@@ -243,7 +243,7 @@ func TestGracefulStop(t *testing.T) {
 
 	for _, handler := range wc.handlers {
 		if handler.stats.MessageInBuffer() != 0 {
-			t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.topic, handler.channel)
+			t.Fatalf("message in buffer should be 0, graceful stop failed, message in buffer %d for topic %s and channel %s", handler.stats.MessageInBuffer(), handler.client.Topic(), handler.client.Channel())
 		}
 	}
 }

@@ -10,8 +10,6 @@ Gonsq example will run following components:
 - Prometheus
 - Grafana
 
-The example will consume considerable amount of CPU and RAM, and no jitter is addded to the example.
-
 To run the example, run:
 
 `docker-compose up -d`
@@ -41,3 +39,11 @@ e285d7355e5c        nsqio/nsq:v1.2.0          "/nsqlookupd"            10 second
 To stop the example, run:
 
 `docker-compose down`
+
+## Accessing The Services
+
+To access NSQAdmin, access: (localhost:4171)[http://localhost:4171]
+
+To access Prometheus, access: (localhost:9090)[http://localhost:9090]
+
+To access NSQ Consumer metrics: access: (localhost:9080/metrics)[http://localhost:9080/metrics]

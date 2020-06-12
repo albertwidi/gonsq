@@ -93,12 +93,14 @@ func main() {
 		}
 	}
 
-	if err := c.Start(); err != nil {
-		panic(err)
-	}
-	defer c.Stop()
-
 	errC := make(chan error)
+
+	go func() {
+		if err := c.Start(); err != nil {
+			errC <- err
+		}
+	}()
+	defer c.Stop()
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {

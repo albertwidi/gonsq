@@ -7,7 +7,8 @@ services:
         command:
         - --nsq.topics=foo,bar
         - --nsq.nsqd-address=nsqd:4150
-        - --publish.jitter=100,500
+        - --publish.concurrency=1
+        - --publish.jitter=0,100
         depends_on:
         - nsqd
         - nsq_consumer
@@ -17,7 +18,7 @@ services:
             context: .
             dockerfile: Dockerfile.consumer
         ports:
-        - "9000:9000"
+        - "9080:9000"
         command:
         - --server.address=:9000
         - --nsq.topics=foo,bar

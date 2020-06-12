@@ -14,12 +14,11 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/albertwidi/gonsq/example/pkg/jitter"
-
 	"github.com/golang/protobuf/proto"
 	"github.com/google/uuid"
 
 	id_message "github.com/albertwidi/gonsq/example/message"
+	"github.com/albertwidi/gonsq/example/pkg/jitter"
 	"github.com/albertwidi/gonsq/producer"
 )
 
@@ -28,6 +27,7 @@ type Flags struct {
 	Channels    string
 	NSQDAddress string
 	Jitter      string
+	Concurrency int
 }
 
 func main() {
@@ -35,10 +35,12 @@ func main() {
 	flag.StringVar(&f.Topics, "nsq.topics", "", "NSQ Topic")
 	flag.StringVar(&f.NSQDAddress, "nsq.nsqd-address", "", "NSQD Address")
 	flag.StringVar(&f.Jitter, "publish.jitter", "100,300", "Jitter for publishing message <min,max>")
+	flag.IntVar(&f.Concurrency, "publish.concurrency", 1, "Concurrency of publisher")
 	flag.Parse()
 
 	fmt.Printf("flags:\n%+v\n", f)
 
+	var jt *jitter.Jitter
 	var topics = strings.Split(f.Topics, ",")
 	var stopC chan struct{}
 	var err error
@@ -47,16 +49,27 @@ func main() {
 	var jitterMin int64
 	var jitterMax int64
 
-	jitterMin, err = strconv.ParseInt(jitterStr[0], 10, 64)
-	if err != nil {
-		panic(err)
+	if jitterStr[0] != "0" && jitterStr[0] != "" {
+		jitterMin, err = strconv.ParseInt(jitterStr[0], 10, 64)
+		if err != nil {
+			panic(err)
+		}
 	}
-	jitterMax, err = strconv.ParseInt(jitterStr[1], 10, 64)
-	if err != nil {
-		panic(err)
+	if jitterStr[1] != "0" && jitterStr[1] != "" {
+		jitterMax, err = strconv.ParseInt(jitterStr[1], 10, 64)
+		if err != nil {
+			panic(err)
+		}
 	}
 
-	jt := jitter.New(jitterMin, jitterMax, time.Now().UnixNano())
+	if jitterMin > jitterMax {
+		panic(fmt.Sprintf("jitter max should be larger than jitter min. Min: %d, Max: %d", jitterMin, jitterMax))
+	}
+
+	// Don't add jitter if min and max is 0
+	if jitterMin != 0 && jitterMax != 0 {
+		jt = jitter.New(jitterMin, jitterMax, time.Now().UnixNano())
+	}
 
 	producer, err := producer.New(context.Background(), producer.Producer{
 		Hostname:   "gonsq-producer",
@@ -67,26 +80,30 @@ func main() {
 	}
 
 	for _, topic := range topics {
-		go func(topic string) {
-			for {
-				select {
-				case <-stopC:
-					return
-				default:
-					time.Sleep(time.Millisecond * time.Duration(jt.Number()))
+		for i := 0; i < f.Concurrency; i++ {
+			go func(topic string) {
+				for {
+					select {
+					case <-stopC:
+						return
+					default:
+						if jt != nil {
+							time.Sleep(time.Millisecond * time.Duration(jt.Number()))
+						}
 
-					message := &id_message.ID{
-						UUID: uuid.New().String(),
-					}
+						message := &id_message.ID{
+							UUID: uuid.New().String(),
+						}
 
-					out, _ := proto.Marshal(message)
+						out, _ := proto.Marshal(message)
 
-					if err := producer.Publish(topic, out); err != nil {
-						log.Println(err)
+						if err := producer.Publish(topic, out); err != nil {
+							log.Println(err)
+						}
 					}
 				}
-			}
-		}(topic)
+			}(topic)
+		}
 	}
 
 	sigChan := make(chan os.Signal, 1)
@@ -102,7 +119,9 @@ func main() {
 
 	// Stop all the goroutines for sending message.
 	for i := 0; i < len(topics); i++ {
-		stopC <- struct{}{}
+		for x := 0; x < f.Concurrency; x++ {
+			stopC <- struct{}{}
+		}
 	}
 
 	fmt.Println("exiting producer")

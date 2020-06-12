@@ -12,11 +12,11 @@ import (
 var (
 	// ErrInvalidConcurrencyConfiguration happens when concurrency configuration number is not
 	// as expected. The configuration is checked when adding new consumer.
-	ErrInvalidConcurrencyConfiguration = errors.New("nsqio: invalid concurrency configuration")
+	ErrInvalidConcurrencyConfiguration = errors.New("gonsq: invalid concurrency configuration")
 	// ErrLookupdsAddrEmpty happens when NSQ lookupd address is empty when wrapping consumers.
-	ErrLookupdsAddrEmpty = errors.New("nsqio: lookupds addresses is empty")
+	ErrLookupdsAddrEmpty = errors.New("gonsq: lookupds addresses is empty")
 	// ErrTopicWithChannelNotFound for error when channel and topic is not found.
-	ErrTopicWithChannelNotFound = errors.New("nsqio: topic and channel not found")
+	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
 )
 
 // ProducerClient is the producer client of NSQ.
@@ -91,10 +91,8 @@ type ConsumerManager struct {
 	lookupdsAddr []string
 
 	mu          sync.RWMutex
-	clients     map[string]ConsumerClient
+	handlers    map[string]*gonsqHandler
 	middlewares []MiddlewareFunc
-	// Using map of topic and channel to make sure double handler registration is not possible.
-	handlers map[string]*gonsqHandler
 
 	startMu sync.Mutex
 	started bool
@@ -116,7 +114,6 @@ func ManageConsumers(lookupdsAddr []string, clients ...ConsumerClient) (*Consume
 	c := ConsumerManager{
 		lookupdsAddr: lookupdsAddr,
 		handlers:     make(map[string]*gonsqHandler),
-		clients:      make(map[string]ConsumerClient),
 		errC:         make(chan error),
 	}
 	return &c, c.AddConsumers(clients...)
@@ -205,6 +202,7 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 
 	if !ok {
 		c.err = fmt.Errorf("gonsq: consumer with topic %s and channel %s does not exist", topic, channel)
+		return
 	}
 
 	if gHandler.handler != nil {
@@ -285,7 +283,7 @@ func (c *ConsumerManager) Started() bool {
 
 // Stop for stopping all the nsq consumer.
 func (c *ConsumerManager) Stop() error {
-	if len(c.clients) == 0 && len(c.handlers) == 0 {
+	if len(c.handlers) == 0 {
 		return nil
 	}
 
@@ -293,12 +291,13 @@ func (c *ConsumerManager) Stop() error {
 	defer c.startMu.Unlock()
 
 	if !c.started {
-		return nil
+		return errors.New("gonsq: consumer manager already stopped")
 	}
 
-	// Stopping all NSQ clients. This should make message consumption to nsqHandler stop.
-	for _, client := range c.clients {
-		client.Stop()
+	// Stopping all NSQ clients. This should make message consumption
+	// to nsqHandler stop.
+	for _, handler := range c.handlers {
+		handler.client.Stop()
 	}
 
 	for _, handler := range c.handlers {

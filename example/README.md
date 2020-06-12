@@ -42,8 +42,8 @@ To stop the example, run:
 
 ## Accessing The Services
 
-To access NSQAdmin, access: (localhost:4171)[http://localhost:4171]
+To access NSQAdmin, access: [http://localhost:4171](http://localhost:4171)
 
-To access Prometheus, access: (localhost:9090)[http://localhost:9090]
+To access Prometheus, access: [http://localhost:9090](http://localhost:9090)
 
-To access NSQ Consumer metrics: access: (localhost:9080/metrics)[http://localhost:9080/metrics]
+To access NSQ Consumer metrics: access: [http://localhost:9080/metrics](http://localhost:9080/metrics)

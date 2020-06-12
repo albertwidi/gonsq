@@ -7,6 +7,7 @@ services:
         command:
         - --nsq.topics=foo,bar
         - --nsq.nsqd-address=nsqd:4150
+        - --publish.jitter=100,500
         depends_on:
         - nsqd
         - nsq_consumer

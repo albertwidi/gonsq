@@ -147,13 +147,9 @@ func TestNSQHandlerHandleMessage(t *testing.T) {
 	backend := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel})
 
 	stats := &Stats{}
-	df := nsqHandler{
-		gonsqHandler: &gonsqHandler{
-			topic:       topic,
-			channel:     channel,
-			messageBuff: make(chan *Message, 2),
-			stats:       stats,
-		},
+	df := &gonsqHandler{
+		messageBuff: make(chan *Message, 2),
+		stats:       stats,
 		// Using buffered channel with length 1,
 		// because in this test we don't listen the message using a worker,
 		// and sending the message to this channel will block.
@@ -198,11 +194,9 @@ func TestNSQHandlerThrottle(t *testing.T) {
 	backend := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel})
 
 	stats := &Stats{}
-	df := nsqHandler{
-		gonsqHandler: &gonsqHandler{
-			messageBuff: make(chan *Message, 3),
-			stats:       stats,
-		},
+	df := &gonsqHandler{
+		messageBuff:        make(chan *Message, 3),
+		stats:              stats,
 		client:             backend,
 		openThrottleFunc:   defaultOpenThrottleFunc,
 		loosenThrottleFunc: defaultLoosenThrottleFunc,

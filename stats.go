@@ -133,7 +133,7 @@ func (s *Stats) addWorker(n int64) int64 {
 
 // Worker return the current number of worker in a message handler.
 func (s *Stats) Worker() int64 {
-	return s.worker
+	return atomic.LoadInt64(&s.worker)
 }
 
 func (s *Stats) setThrottle(b bool) statsb {

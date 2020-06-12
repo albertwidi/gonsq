@@ -6,17 +6,17 @@ import (
 	"sync"
 	"time"
 
-	gonsq "github.com/nsqio/go-nsq"
+	nsqio "github.com/nsqio/go-nsq"
 )
 
 var (
 	// ErrInvalidConcurrencyConfiguration happens when concurrency configuration number is not
 	// as expected. The configuration is checked when adding new consumer.
-	ErrInvalidConcurrencyConfiguration = errors.New("gonsq: invalid concurrency configuration")
+	ErrInvalidConcurrencyConfiguration = errors.New("nsqio: invalid concurrency configuration")
 	// ErrLookupdsAddrEmpty happens when NSQ lookupd address is empty when wrapping consumers.
-	ErrLookupdsAddrEmpty = errors.New("gonsq: lookupds addresses is empty")
+	ErrLookupdsAddrEmpty = errors.New("nsqio: lookupds addresses is empty")
 	// ErrTopicWithChannelNotFound for error when channel and topic is not found.
-	ErrTopicWithChannelNotFound = errors.New("gonsq: topic and channel not found")
+	ErrTopicWithChannelNotFound = errors.New("nsqio: topic and channel not found")
 )
 
 // ProducerClient is the producer client of NSQ.
@@ -36,8 +36,8 @@ type ConsumerClient interface {
 	Topic() string
 	Channel() string
 	Stop()
-	AddHandler(handler gonsq.Handler)
-	AddConcurrentHandlers(handler gonsq.Handler, concurrency int)
+	AddHandler(handler nsqio.Handler)
+	AddConcurrentHandlers(handler nsqio.Handler, concurrency int)
 	ConnectToNSQLookupds(addresses []string) error
 	ChangeMaxInFlight(n int)
 	Concurrency() int
@@ -98,7 +98,13 @@ type ConsumerManager struct {
 
 	startMu sync.Mutex
 	started bool
-	errC    chan error
+
+	// Error saves error in handle method, because
+	// handle method does not return any error.
+	// This error then evaluated when the manager
+	// starts.
+	err  error
+	errC chan error
 }
 
 // ManageConsumers creates a new ConsumerManager
@@ -118,13 +124,43 @@ func ManageConsumers(lookupdsAddr []string, clients ...ConsumerClient) (*Consume
 
 // AddConsumers add more consumers to the consumer object.
 func (c *ConsumerManager) AddConsumers(clients ...ConsumerClient) error {
-	for _, b := range clients {
-		if b.Concurrency() <= 0 || b.MaxInFlight() <= 0 {
-			return fmt.Errorf("%w,concurrency: %d, maxInFlight: %d", ErrInvalidConcurrencyConfiguration, b.Concurrency(), b.MaxInFlight())
+	for _, cl := range clients {
+		concurrency := cl.Concurrency()
+		maxInFlight := cl.MaxInFlight()
+
+		if concurrency <= 0 || maxInFlight <= 0 {
+			return fmt.Errorf("%w,concurrency: %d, maxInFlight: %d", ErrInvalidConcurrencyConfiguration, cl.Concurrency(), cl.MaxInFlight())
 		}
+
+		// Determine the maximum length of buffer based on concurrency number
+		// for example, the concurrency have multiplication factor of 5.
+		//
+		// |message_processed|buffer|buffer|buffer|limit|
+		//          1           2     3      4      5
+		//
+		// Or in throttling case.
+		//
+		// |message_processed|buffer|throttle_limit|throttle_limit|limit|
+		//          1           2            3             4         5
+		//
+		buffLen := concurrency * maxInFlight
+		gHandler := &gonsqHandler{
+			client:             cl,
+			messageBuff:        make(chan *Message, buffLen),
+			stats:              &Stats{},
+			stopC:              make(chan struct{}),
+			openThrottleFunc:   defaultOpenThrottleFunc,
+			loosenThrottleFunc: defaultLoosenThrottleFunc,
+			breakThrottleFunc:  defaultBreakThrottleFunc,
+		}
+		gHandler.stats.setConcurrency(concurrency)
+		gHandler.stats.setMaxInFlight(maxInFlight)
+		gHandler.stats.setBufferLength(buffLen)
+
 		c.mu.Lock()
-		c.clients[mergeTopicAndChannel(b.Topic(), b.Channel())] = b
+		c.handlers[mergeTopicAndChannel(cl.Topic(), cl.Channel())] = gHandler
 		c.mu.Unlock()
+
 	}
 	return nil
 }
@@ -164,55 +200,31 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 	}
 
 	c.mu.RLock()
-	client := c.clients[mergeTopicAndChannel(topic, channel)]
+	gHandler, ok := c.handlers[mergeTopicAndChannel(topic, channel)]
 	c.mu.RUnlock()
 
-	h := &gonsqHandler{
-		topic:   topic,
-		channel: channel,
-		handler: handler,
-		stopC:   make(chan struct{}),
-		// stats is allocated here, once. And will be shared
-		// into every concurrent gonsq handlers and messages.
-		stats: &Stats{},
+	if !ok {
+		c.err = fmt.Errorf("gonsq: consumer with topic %s and channel %s does not exist", topic, channel)
 	}
 
-	// Only append this information if backend is found, otherwise let
-	// the handler appended without this information.
-	// If backend is nil in this step, it will reproduce error when consumer
-	// is starting, this is because the name of clients will not be detected
-	// in start state. So its safe to skip the error here.
-	if client != nil {
-		concurrency := client.Concurrency()
-		maxInFlight := client.MaxInFlight()
-
-		// Determine the maximum length of buffer based on concurrency number
-		// for example, the concurrency have multiplication factor of 5.
-		//
-		// |message_processed|buffer|buffer|buffer|limit|
-		//          1           2     3      4      5
-		//
-		// Or in throttling case.
-		//
-		// |message_processed|buffer|throttle_limit|throttle_limit|limit|
-		//          1           2            3             4         5
-		//
-		buffLen := concurrency * maxInFlight
-		h.messageBuff = make(chan *Message, buffLen)
-		h.stats.setConcurrency(concurrency)
-		h.stats.setMaxInFlight(maxInFlight)
-		h.stats.setBufferLength(buffLen)
+	if gHandler.handler != nil {
+		c.err = fmt.Errorf("gonsq: handler for topic %s and channel %s registered twice", topic, channel)
+		return
 	}
 
-	c.mu.RLock()
-	if _, ok := c.handlers[mergeTopicAndChannel(topic, channel)]; ok {
-		// TODO(albert) create test for panic behavior.
-		panic(fmt.Errorf("handler with topic %s and channel %s already exist", topic, channel))
-	}
-	c.mu.RUnlock()
+	// Set the gonsq handler.
+	gHandler.handler = handler
+	// Set the nsq handler for HandleMessage.
+	// Use AddHandler instead of AddConcurrentHandler,
+	// consuming message from nsqd is very fast and
+	// most of the timewe don't need to use concurrent handler.
+	gHandler.client.AddHandler(gHandler)
+	// Change the MaxInFlight to buffLength as the number
+	// of message won't exceed the buffLength.
+	gHandler.client.ChangeMaxInFlight(gHandler.stats.BufferLength())
 
 	c.mu.Lock()
-	c.handlers[mergeTopicAndChannel(topic, channel)] = h
+	c.handlers[mergeTopicAndChannel(topic, channel)] = gHandler
 	c.mu.Unlock()
 }
 
@@ -220,36 +232,24 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 func (c *ConsumerManager) Start() error {
 	c.startMu.Lock()
 
+	if c.err != nil {
+		c.startMu.Unlock()
+		return c.err
+	}
+
 	if c.started {
 		c.startMu.Unlock()
 		return nil
 	}
 
+	// List of clients to separate the invocation of spawning
+	// consumer for consuming message and connecting the client
+	// to the NSQlookupds.
 	var clients []ConsumerClient
 
 	for _, handler := range c.handlers {
-		client, ok := c.clients[mergeTopicAndChannel(handler.topic, handler.channel)]
-		if !ok {
-			return fmt.Errorf("nsq: backend with topoc %s and channel %s not found. error: %w", handler.topic, handler.channel, ErrTopicWithChannelNotFound)
-		}
-
-		// Create a default handler for consuming message directly from nsq handler.
-		dh := nsqHandler{
-			handler,
-			client,
-			defaultOpenThrottleFunc,
-			defaultLoosenThrottleFunc,
-			defaultBreakThrottleFunc,
-		}
-		// ConsumerConcurrency for consuming message from NSQ.
-		// Most of the time we don't need consumerConcurrency because consuming message from NSQ is very fast,
-		// the handler or the true consumer might need time to handle the message.
-		client.AddHandler(&dh)
-		// Change the MaxInFlight to buffLength as the number of message won't exceed the buffLength.
-		client.ChangeMaxInFlight(dh.stats.BufferLength())
-
-		// Invoke all handler to work,
-		// depends on the number of concurrency.
+		// Invoke all handler to work, depends
+		// on the concurrency number.
 		for i := 0; i < handler.stats.Concurrency(); i++ {
 			go func(handler *gonsqHandler) {
 				err := handler.Start()
@@ -259,14 +259,14 @@ func (c *ConsumerManager) Start() error {
 			}(handler)
 		}
 
-		clients = append(clients, client)
+		clients = append(clients, handler.client)
 	}
 
 	// Connect to all NSQLookupds.
 	for _, client := range clients {
 		go func(client ConsumerClient) {
 			if err := client.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
-				c.errC <- fmt.Errorf("gonsq: topoic: %s channel: %s error connecting to lookupds: %v. Error: %v", client.Topic(), client.Channel(), c.lookupdsAddr, err)
+				c.errC <- fmt.Errorf("nsqio: topoic: %s channel: %s error connecting to lookupds: %v. Error: %v", client.Topic(), client.Channel(), c.lookupdsAddr, err)
 			}
 		}(client)
 	}

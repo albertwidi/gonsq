@@ -65,7 +65,7 @@ func TestStartStop(t *testing.T) {
 		}
 	}
 
-	if err := wc.Stop(); err != nil {
+	if err := wc.Stop(context.Background()); err != nil {
 		t.Error(err)
 		return
 	}
@@ -171,7 +171,7 @@ func TestMiddlewareChaining(t *testing.T) {
 		return
 	}
 
-	if err := wc.Stop(); err != nil {
+	if err := wc.Stop(context.Background()); err != nil {
 		t.Error(err)
 		return
 	}
@@ -237,7 +237,7 @@ func TestGracefulStop(t *testing.T) {
 		}
 	}
 
-	if err := wc.Stop(); err != nil {
+	if err := wc.Stop(context.Background()); err != nil {
 		t.Fatal(err)
 	}
 

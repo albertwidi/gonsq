@@ -191,7 +191,7 @@ func TestThrottleMiddleware(t *testing.T) {
 	}
 	close(errChan)
 
-	if err := wc.Stop(); err != nil {
+	if err := wc.Stop(context.Background()); err != nil {
 		t.Error(err)
 		return
 	}

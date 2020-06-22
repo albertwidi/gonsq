@@ -99,7 +99,7 @@ func main() {
 			errC <- err
 		}
 	}()
-	defer c.Stop()
+	defer c.Stop(context.Background())
 
 	http.Handle("/metrics", promhttp.Handler())
 	go func() {

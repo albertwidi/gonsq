@@ -1,9 +1,0 @@
-# This is only a hack to forcefully update pkg.go.dev.
-
-FROM golang:1.14.2
-WORKDIR /consumer
-COPY ./consumer/main.go ./
-COPY ./message ./message
-COPY ./pkg ./pkg
-RUN go mod init github.com/albertwidi/gonsq_consumer && \
-    go get -v ./...

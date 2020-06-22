@@ -20,7 +20,7 @@ func startConsumer(t *testing.T, cm *ConsumerManager) error {
 	defer cancel()
 
 	go func() {
-		if err := cm.Start(); err != nil {
+		if err := cm.Start([]string{"test"}); err != nil {
 			errC <- err
 		}
 	}()
@@ -44,7 +44,7 @@ func TestStartStop(t *testing.T) {
 	fake := fakensq.New()
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, MaxInFlight: 10})
 
-	wc, err := ManageConsumers([]string{"testing"}, consumer)
+	wc, err := ManageConsumers(consumer)
 	if err != nil {
 		t.Error(err)
 		return
@@ -124,7 +124,7 @@ func TestMiddlewareChaining(t *testing.T) {
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: 1, MaxInFlight: 10})
 	publisher := fake.NewProducer()
 
-	wc, err := ManageConsumers([]string{"testing"}, consumer)
+	wc, err := ManageConsumers(consumer)
 	if err != nil {
 		t.Error(err)
 		return
@@ -180,7 +180,7 @@ func TestMiddlewareChaining(t *testing.T) {
 func TestGracefulStop(t *testing.T) {
 	fake := fakensq.New()
 	publisher := fake.NewProducer()
-	wc, err := ManageConsumers([]string{"testing"})
+	wc, err := ManageConsumers()
 	if err != nil {
 		t.Fatal(err)
 	}

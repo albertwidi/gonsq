@@ -60,7 +60,7 @@ func TestNSQHandlerSetConcurrency(t *testing.T) {
 		fake := fakensq.New()
 		consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: c.concurrency, MaxInFlight: c.buffMultiplier})
 
-		wc, err := ManageConsumers([]string{"testing"}, consumer)
+		wc, err := ManageConsumers(consumer)
 		if !errors.Is(err, c.expectError) {
 			t.Errorf("expecting error %v but got %v", c.expectError, err)
 			return
@@ -103,7 +103,7 @@ func TestNSQHandlerConcurrencyControl(t *testing.T) {
 	fake := fakensq.New()
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 
-	wc, err := ManageConsumers([]string{"testing"}, consumer)
+	wc, err := ManageConsumers(consumer)
 	if err != nil {
 		t.Error(err)
 		return

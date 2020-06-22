@@ -22,7 +22,7 @@ func startConsumer(t *testing.T, cm *gonsq.ConsumerManager) error {
 	defer cancel()
 
 	go func() {
-		if err := cm.Start(); err != nil {
+		if err := cm.Start([]string{"test"}); err != nil {
 			errC <- err
 		}
 	}()
@@ -66,7 +66,7 @@ func TestThrottleMiddleware(t *testing.T) {
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})
 	publisher := fake.NewProducer()
 
-	wc, err := gonsq.ManageConsumers([]string{"testing"}, consumer)
+	wc, err := gonsq.ManageConsumers(consumer)
 	if err != nil {
 		t.Error(err)
 		return
@@ -131,11 +131,6 @@ func TestThrottleMiddleware(t *testing.T) {
 	if err := startConsumer(t, wc); err != nil {
 		t.Error(err)
 		return
-	}
-
-	// Wait until the consumer is started.
-	for !wc.Started() {
-		time.Sleep(time.Millisecond * 100)
 	}
 
 	// Note that in this test, we set the maxInFlight to 10.

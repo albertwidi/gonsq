@@ -50,6 +50,8 @@ type ConsumerClient interface {
 type ProducerManager struct {
 	producer ProducerClient
 	topics   map[string]bool
+
+	mu sync.RWMutex
 }
 
 // ManageProducers is a function to wrap the nsq producer.
@@ -67,18 +69,29 @@ func ManageProducers(backend ProducerClient, topics ...string) (*ProducerManager
 	return &p, nil
 }
 
+func (p *ProducerManager) topicExist(topic string) error {
+	p.mu.RLock()
+	ok := p.topics[topic]
+	p.mu.RUnlock()
+
+	if !ok {
+		return fmt.Errorf("nsq: topic %s is not eixst in this producer", topic)
+	}
+	return nil
+}
+
 // Publish message to nsqd, if a given topic does not exists, then return error.
 func (p *ProducerManager) Publish(topic string, body []byte) error {
-	if ok := p.topics[topic]; !ok {
-		return errors.New("nsq: topic is not allowed to be published by this producer")
+	if err := p.topicExist(topic); err != nil {
+		return err
 	}
 	return p.producer.Publish(topic, body)
 }
 
 // MultiPublish message to nsqd, ifa given topic does not exists, then return error.
 func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
-	if ok := p.topics[topic]; !ok {
-		return errors.New("nsq: topic is not allowed to be published by this producer")
+	if err := p.topicExist(topic); err != nil {
+		return err
 	}
 	return p.producer.MultiPublish(topic, body)
 }
@@ -88,14 +101,17 @@ func (p *ProducerManager) MultiPublish(topic string, body [][]byte) error {
 // the incoming messages. The ConsumerManager also manage the lifecycle of the
 // nsq consumers client and the concurrent handlers(start and stop).
 type ConsumerManager struct {
-	lookupdsAddr []string
-
 	mu          sync.RWMutex
 	handlers    map[string]*gonsqHandler
 	middlewares []MiddlewareFunc
 
 	startMu sync.Mutex
 	started bool
+
+	// Default functions for throttling.
+	OpenThrottleFunc   func(*Stats) bool
+	BreaKThrottleFunc  func(*Stats) bool
+	LoosenThrottleFunc func(*Stats) bool
 
 	// Error saves error in handle method, because
 	// handle method does not return any error.
@@ -106,15 +122,13 @@ type ConsumerManager struct {
 }
 
 // ManageConsumers creates a new ConsumerManager
-func ManageConsumers(lookupdsAddr []string, clients ...ConsumerClient) (*ConsumerManager, error) {
-	if lookupdsAddr == nil {
-		return nil, ErrLookupdsAddrEmpty
-	}
-
+func ManageConsumers(clients ...ConsumerClient) (*ConsumerManager, error) {
 	c := ConsumerManager{
-		lookupdsAddr: lookupdsAddr,
-		handlers:     make(map[string]*gonsqHandler),
-		errC:         make(chan error),
+		handlers:           make(map[string]*gonsqHandler),
+		errC:               make(chan error),
+		OpenThrottleFunc:   defaultOpenThrottleFunc,
+		BreaKThrottleFunc:  defaultBreakThrottleFunc,
+		LoosenThrottleFunc: defaultLoosenThrottleFunc,
 	}
 	return &c, c.AddConsumers(clients...)
 }
@@ -146,9 +160,9 @@ func (c *ConsumerManager) AddConsumers(clients ...ConsumerClient) error {
 			messageBuff:        make(chan *Message, buffLen),
 			stats:              &Stats{},
 			stopC:              make(chan struct{}),
-			openThrottleFunc:   defaultOpenThrottleFunc,
-			loosenThrottleFunc: defaultLoosenThrottleFunc,
-			breakThrottleFunc:  defaultBreakThrottleFunc,
+			openThrottleFunc:   c.OpenThrottleFunc,
+			loosenThrottleFunc: c.BreaKThrottleFunc,
+			breakThrottleFunc:  c.LoosenThrottleFunc,
 		}
 		gHandler.stats.setConcurrency(concurrency)
 		gHandler.stats.setMaxInFlight(maxInFlight)
@@ -227,7 +241,11 @@ func (c *ConsumerManager) Handle(topic, channel string, handler HandlerFunc) {
 }
 
 // Start for start the consumer. This will trigger all workers to start.
-func (c *ConsumerManager) Start() error {
+func (c *ConsumerManager) Start(lookupdsAddr []string) error {
+	if lookupdsAddr == nil {
+		return ErrLookupdsAddrEmpty
+	}
+
 	c.startMu.Lock()
 
 	if c.err != nil {
@@ -263,8 +281,8 @@ func (c *ConsumerManager) Start() error {
 	// Connect to all NSQLookupds.
 	for _, client := range clients {
 		go func(client ConsumerClient) {
-			if err := client.ConnectToNSQLookupds(c.lookupdsAddr); err != nil {
-				c.errC <- fmt.Errorf("nsqio: topoic: %s channel: %s error connecting to lookupds: %v. Error: %v", client.Topic(), client.Channel(), c.lookupdsAddr, err)
+			if err := client.ConnectToNSQLookupds(lookupdsAddr); err != nil {
+				c.errC <- fmt.Errorf("nsqio: topoic: %s channel: %s error connecting to lookupds: %v. Error: %v", client.Topic(), client.Channel(), lookupdsAddr, err)
 			}
 		}(client)
 	}
@@ -274,11 +292,6 @@ func (c *ConsumerManager) Start() error {
 	c.startMu.Unlock()
 
 	return <-c.errC
-}
-
-// Started return the status of the consumer, whether the consumer started or not.
-func (c *ConsumerManager) Started() bool {
-	return c.started
 }
 
 // Stop for stopping all the nsq consumer.

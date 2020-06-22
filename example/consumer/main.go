@@ -71,7 +71,7 @@ func main() {
 		})
 	}
 
-	c, err := consumer.NewGroup(context.Background(), []string{f.NSQLookupdAddress}, groups)
+	c, err := consumer.NewGroup(context.Background(), groups)
 	if err != nil {
 		panic(err)
 	}
@@ -95,7 +95,7 @@ func main() {
 	errC := make(chan error)
 
 	go func() {
-		if err := c.Start(); err != nil {
+		if err := c.Start([]string{f.NSQLookupdAddress}); err != nil {
 			errC <- err
 		}
 	}()

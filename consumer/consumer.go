@@ -40,8 +40,8 @@ func (c *Channel) validate() error {
 // NewGroup for creating a new consumer group using gonsq.WrapConsumers. This consumer group is not like Kafka consumer group,
 // this consumer group is only grouping consumers with same topic. A consumer with different topic will grouped into another
 // wrapper in gonsq.Consumer.
-func NewGroup(ctx context.Context, lookupdAddresses []string, groups []Group) (*gonsq.ConsumerManager, error) {
-	wc, err := gonsq.ManageConsumers(lookupdAddresses)
+func NewGroup(ctx context.Context, groups []Group) (*gonsq.ConsumerManager, error) {
+	wc, err := gonsq.ManageConsumers()
 	if err != nil {
 		return nil, err
 	}

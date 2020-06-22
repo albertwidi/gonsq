@@ -24,9 +24,25 @@ import (
 )
 
 const (
-	_statsThrottle       = 1
-	_statsThrottleLoosen = 2
+	_statsThrottle       = 2
+	_statsThrottleLoosen = 1
 )
+
+// ThrottleStats is the indicator of throttling.
+// 0 = no throttle.
+// 1 = throttle loosen.
+// 2 = throttled.
+type ThrottleStats int32
+
+// IsThrottled return true if throttle is on.
+func (t ThrottleStats) IsThrottled() bool {
+	return t == _statsThrottle
+}
+
+// IsThrottleLoosen return true if throttle loosen.
+func (t ThrottleStats) IsThrottleLoosen() bool {
+	return t == _statsThrottleLoosen
+}
 
 // Stats object to be included in every nsq consumer worker
 // to collect statuses of nsq consumers.
@@ -128,18 +144,8 @@ func (s *Stats) setThrottle(throttle int32) int32 {
 }
 
 // Throttle return whether the consumer/producer is being throttled or not.
-func (s *Stats) Throttle() int32 {
-	return atomic.LoadInt32(&s.throttle)
-}
-
-// IsThrottled return true if throttle is on.
-func (s *Stats) IsThrottled() bool {
-	return s.Throttle() == _statsThrottle
-}
-
-// IsThrottleLoosen return true if throttle is on and loosen.
-func (s *Stats) IsThrottleLoosen() bool {
-	return s.Throttle() == _statsThrottleLoosen
+func (s *Stats) Throttle() ThrottleStats {
+	return ThrottleStats(atomic.LoadInt32(&s.throttle))
 }
 
 func (s *Stats) addThrottleCount(n int64) int64 {

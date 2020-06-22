@@ -36,9 +36,9 @@ func New(throttleLimit, loosenLimit int) *Throttle {
 // This middleware check whether there is some information about throttling in the message.
 func (tm *Throttle) Throttle(handler gonsq.HandlerFunc) gonsq.HandlerFunc {
 	return func(ctx context.Context, message *gonsq.Message) error {
-		if message.Stats.IsThrottleLoosen() {
+		if message.Stats.Throttle().IsThrottleLoosen() {
 			tm.secondLimit.Take()
-		} else if message.Stats.IsThrottled() {
+		} else if message.Stats.Throttle().IsThrottled() {
 			tm.firstLimit.Take()
 		}
 		return handler(ctx, message)

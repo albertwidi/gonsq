@@ -18,7 +18,7 @@ func startConsumer(t *testing.T, cm *gonsq.ConsumerManager) error {
 
 	var err error
 	errC := make(chan error)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
 	go func() {
@@ -95,7 +95,7 @@ func TestThrottleMiddleware(t *testing.T) {
 
 		// Check whether a throttled message is exists
 		// this message should exists because throttle middleware is used.
-		if message.Stats.IsThrottled() {
+		if message.Stats.Throttle().IsThrottled() {
 			atomic.AddInt32(&messageThrottled, 1)
 			// Check if message throttled before it should be.
 			if publishedMessageCount <= 2 {
@@ -115,7 +115,7 @@ func TestThrottleMiddleware(t *testing.T) {
 			}
 
 			// Check if the message is still throttled, because the throttle status should be gone.
-			if message.Stats.IsThrottled() {
+			if message.Stats.Throttle().IsThrottled() {
 				errChan <- errors.New("message is still throttled at the end of the test")
 			}
 			errChan <- errNil

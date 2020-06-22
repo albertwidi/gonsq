@@ -16,7 +16,7 @@ func startConsumer(t *testing.T, cm *ConsumerManager) error {
 
 	var err error
 	errC := make(chan error)
-	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*100)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond*200)
 	defer cancel()
 
 	go func() {
@@ -56,7 +56,7 @@ func TestStartStop(t *testing.T) {
 	}
 
 	// Give time for consumer to start the work.
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 200)
 
 	for _, h := range wc.handlers {
 		if h.stats.Worker() == 0 {
@@ -71,7 +71,7 @@ func TestStartStop(t *testing.T) {
 	}
 
 	// Give time for consumer to stop the work.
-	time.Sleep(time.Millisecond * 100)
+	time.Sleep(time.Millisecond * 200)
 
 	for _, h := range wc.handlers {
 		if h.stats.Worker() != 0 {

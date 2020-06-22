@@ -14,13 +14,23 @@ type HandlerFunc func(ctx context.Context, message *Message) error
 // MiddlewareFunc for nsq middleware
 type MiddlewareFunc func(handler HandlerFunc) HandlerFunc
 
+// Handler handle messages from NSQD and pass the message into the
+// message handler via channel.
+//
+// Handler implements nsqio.Handler to consume the message from NSQD(via nsqio/go-nsq)
+// and pass the message via Channel. The messages from channel is consumed
+// via worker goroutines that runs when Consume method is called. The handler
+// responsible to stop the worker goroutines via Stop method.
 type Handler interface {
 	// HandleMessage implements nsqio.Handler to directly consume
 	// messages from nsqio client. HandleMessage then pass the message
 	// into internal buffered channel, so the message can be consumed
 	// by Consume method.
 	HandleMessage(message *nsqio.Message)
+	// Consume starts the worker goroutines, to consume messages
+	// in the buffered channel.
 	Consume() error
+	// Stop stops all worker goroutines.
 	Stop()
 }
 
@@ -122,6 +132,11 @@ func (gh *gonsqHandler) HandleMessage(message *nsqio.Message) error {
 		gh.client.ChangeMaxInFlight(0)
 		// Add the number of throttle count.
 		gh.stats.addThrottleCount(1)
+
+		// Loop to wait until condition in breakThrottleFunc met.
+		// The breakThrottleFunc will be checked first before loosenThrottleFunc is checked,
+		// because there is no need to set the loosenThrottle stats if the throttle stat
+		// is off.
 		for {
 			// Sleep every one second to check whether the message number is already decreased in the buffer,
 			// it might be better to have a lower evaluation interval, but need some metrics first.

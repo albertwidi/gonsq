@@ -39,26 +39,28 @@ func startConsumer(t *testing.T, cm *gonsq.ConsumerManager) error {
 
 func TestThrottleMiddleware(t *testing.T) {
 	var (
-		topic                 = "test_topic"
-		channel               = "test_channel"
-		publishedMessageCount int32
-		workerMessageCount    int32
-		messageThrottled      int32
+		topic   = "test_topic"
+		channel = "test_channel"
+
+		publishedMessageCount,
+		workerMessageCount,
+		messageThrottled int32
+
 		// Use a buffered channel as error channel to make sure the worker is not blocked.
 		// Because we will always block the 1st message with time.Sleep, the channel will
 		// always full at message number 2. Make it so it won't block message number 2 and
 		// so on.
 		errChan = make(chan error, 2)
+
 		// To make sure that error is being sent back.
-		errNil = errors.New("error should be nil")
-
+		errNil        = errors.New("error should be nil")
 		messageExpect = "test middleware throttling"
-	)
 
-	// We are using fake consumer, this means the concurrency is always 1
-	// and the number of message buffer is 1 * maxInFlight
-	maxInFlight := 10
-	concurrency := 1
+		// Using fake consumer, this means the concurrency is always 1
+		// and the number of message buffer is 1 * maxInFlight
+		maxInFlight = 10
+		concurrency = 1
+	)
 
 	fake := fakensq.New()
 	consumer := fake.NewConsumer(fakensq.ConsumerConfig{Topic: topic, Channel: channel, Concurrency: concurrency, MaxInFlight: maxInFlight})

@@ -70,7 +70,8 @@ func TestThrottleMiddleware(t *testing.T) {
 		return
 	}
 
-	tm := Throttle{TimeDelay: time.Millisecond * 10}
+	// tm := Throttle{TimeDelay: time.Millisecond * 10}
+	tm := New(10, 100)
 	// Use throttle middleware.
 	wc.Use(
 		tm.Throttle,
@@ -94,7 +95,7 @@ func TestThrottleMiddleware(t *testing.T) {
 
 		// Check whether a throttled message is exists
 		// this message should exists because throttle middleware is used.
-		if message.Stats.Throttle() {
+		if message.Stats.IsThrottled() {
 			atomic.AddInt32(&messageThrottled, 1)
 			// Check if message throttled before it should be.
 			if publishedMessageCount <= 2 {
@@ -114,7 +115,7 @@ func TestThrottleMiddleware(t *testing.T) {
 			}
 
 			// Check if the message is still throttled, because the throttle status should be gone.
-			if message.Stats.Throttle() {
+			if message.Stats.IsThrottled() {
 				errChan <- errors.New("message is still throttled at the end of the test")
 			}
 			errChan <- errNil

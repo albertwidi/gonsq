@@ -117,7 +117,7 @@ func (gh *gonsqHandler) HandleMessage(message *nsqio.Message) error {
 		// Set the handler throttle to true, so all message will be throttled right away.
 		// This should give signal to all handler to start the throttle mechanism, if
 		// the throttle middleware is activated.
-		gh.stats.setThrottle(true)
+		gh.stats.setThrottle(_statsThrottle)
 		// Pause the message consumption to NSQD by set the MaxInFlight to 0.
 		gh.client.ChangeMaxInFlight(0)
 		// Add the number of throttle count.
@@ -129,19 +129,19 @@ func (gh *gonsqHandler) HandleMessage(message *nsqio.Message) error {
 			// but will have some effect for the nsqd itself because we pause the message consumption from nsqd.
 			time.Sleep(time.Second * 1)
 
-			// Loosen the throttle condition by set the throttle status to false, but don't continue to
-			// consume the messages from nsqd yet, let the breakThrottleFunc continue the message consumption
-			// from nsqd.
-			if gh.loosenThrottleFunc(gh.stats) {
-				gh.stats.setThrottle(false)
-			}
-
 			// Break the throttle completely by contiue to consuming messages from nsqd.
 			if gh.breakThrottleFunc(gh.stats) {
 				// Resume the message consumption to NSQD by set the MaxInFlight to buffer size.
 				gh.client.ChangeMaxInFlight(int(gh.stats.BufferLength()))
-				gh.stats.setThrottle(false)
+				gh.stats.setThrottle(0)
 				break
+			}
+
+			// Loosen the throttle condition by set the throttle status to false, but don't continue to
+			// consume the messages from nsqd yet, let the breakThrottleFunc continue the message consumption
+			// from nsqd.
+			if gh.loosenThrottleFunc(gh.stats) {
+				gh.stats.setThrottle(_statsThrottleLoosen)
 			}
 		}
 	}

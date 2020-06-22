@@ -64,23 +64,23 @@ func TestStatsMessageInBuff(t *testing.T) {
 	}
 }
 
-func TestStatsThrottle(t *testing.T) {
-	booleans := []bool{
-		true, false, true, true, false, false, true,
-	}
+// func TestStatsThrottle(t *testing.T) {
+// 	booleans := []bool{
+// 		true, false, true, true, false, false, true,
+// 	}
 
-	s := Stats{}
+// 	s := Stats{}
 
-	var b bool
-	for _, boolean := range booleans {
-		b = boolean
-		s.setThrottle(boolean)
+// 	var b bool
+// 	for _, boolean := range booleans {
+// 		b = boolean
+// 		s.setThrottle(boolean)
 
-		if b != s.Throttle().Boolean() {
-			t.Fatalf("expecting throttle value of %v but got %v", b, s.Throttle())
-		}
-	}
-}
+// 		if b != s.Throttle().Boolean() {
+// 			t.Fatalf("expecting throttle value of %v but got %v", b, s.Throttle())
+// 		}
+// 	}
+// }
 
 func TestThrottleCount(t *testing.T) {
 	counts := []int64{

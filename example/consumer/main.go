@@ -10,7 +10,6 @@ import (
 	"os/signal"
 	"strings"
 	"syscall"
-	"time"
 
 	"github.com/golang/protobuf/proto"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
@@ -78,9 +77,9 @@ func main() {
 	}
 
 	// Initialize throttle middleware.
-	tmw := throttle.Throttle{
-		TimeDelay: time.Second,
-	}
+	// This means, in full throttle, only consume 10 messages per second,
+	// and in loosen throttle, consume 50 messages per second.
+	tmw := throttle.New(10, 50)
 
 	// Chain the middleware, make sure
 	// metrics is always the first middleware.

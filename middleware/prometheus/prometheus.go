@@ -107,7 +107,7 @@ func Metrics(handler nsq.HandlerFunc) nsq.HandlerFunc {
 		gaugeMetrics[_nsqWorkerCurrentGauge].
 			WithLabelValues(message.Topic, message.Channel).Set(float64(message.Stats.Worker()))
 		gaugeMetrics[_nsqThrottleGauge].
-			WithLabelValues(message.Topic, message.Channel).Set(float64(message.Stats.Throttle().Int()))
+			WithLabelValues(message.Topic, message.Channel).Set(float64(message.Stats.Throttle()))
 		gaugeMetrics[_nsqMessageInBuffGauge].
 			WithLabelValues(message.Topic, message.Channel).Set(float64(message.Stats.MessageInBuffer()))
 

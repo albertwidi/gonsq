@@ -2,9 +2,8 @@
 //
 // Worker Stats
 //
-// In the worker stats, statuses only shared within the worker. The worker is managed by a nsqHandler
-// to control the flow of the mssage from NSQ to the internal handler, inside the worker. The global stats pointer
-// will be included into all worker stats object. This is because each worker will pass the stats into the message,
+// Statuses only shared within the handler. The worker is managed by a nsqHandler
+// The stats pointer included into all handler object. This is because each handler will pass the stats into the message,
 // so the handler will also have the information of current nsq stats. This is useful for creating a middleware
 // where stats information is needed for evaluation or throwing the stats to somewhere else.
 // These following items are inside the Worker Stats:
@@ -21,25 +20,13 @@
 package gonsq
 
 import (
-	"sync"
 	"sync/atomic"
 )
 
-// statsb is a boolean type for stats.
-type statsb bool
-
-// Int return int value of throttle status
-func (sb statsb) Int() int {
-	if !sb {
-		return 0
-	}
-	return 1
-}
-
-// Boolean return boolean value of throttle status
-func (sb statsb) Boolean() bool {
-	return bool(sb)
-}
+const (
+	_statsThrottle       = 1
+	_statsThrottleLoosen = 2
+)
 
 // Stats object to be included in every nsq consumer worker
 // to collect statuses of nsq consumers.
@@ -63,8 +50,7 @@ type Stats struct {
 	// Worker is the current number of message processing worker.
 	worker int64
 	// Throttle is the status of throttle, true means throttle is on.
-	throttleMu sync.RWMutex
-	throttle   statsb
+	throttle int32
 	// Throttle count is the total count of throttle happened.
 	throttleCount int64
 	// Concurrency is the number of concurrency intended for the consumer.
@@ -136,18 +122,24 @@ func (s *Stats) Worker() int64 {
 	return atomic.LoadInt64(&s.worker)
 }
 
-func (s *Stats) setThrottle(b bool) statsb {
-	s.throttleMu.Lock()
-	defer s.throttleMu.Unlock()
-	s.throttle = statsb(b)
-	return s.throttle
+func (s *Stats) setThrottle(throttle int32) int32 {
+	atomic.StoreInt32(&s.throttle, throttle)
+	return throttle
 }
 
 // Throttle return whether the consumer/producer is being throttled or not.
-func (s *Stats) Throttle() statsb {
-	s.throttleMu.RLock()
-	s.throttleMu.RUnlock()
-	return s.throttle
+func (s *Stats) Throttle() int32 {
+	return atomic.LoadInt32(&s.throttle)
+}
+
+// IsThrottled return true if throttle is on.
+func (s *Stats) IsThrottled() bool {
+	return s.Throttle() == _statsThrottle
+}
+
+// IsThrottleLoosen return true if throttle is on and loosen.
+func (s *Stats) IsThrottleLoosen() bool {
+	return s.Throttle() == _statsThrottleLoosen
 }
 
 func (s *Stats) addThrottleCount(n int64) int64 {

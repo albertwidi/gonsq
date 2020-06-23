@@ -90,8 +90,8 @@ func (c *ConsumerManager) AddConsumers(clients ...ConsumerClient) error {
 			stats:              &Stats{},
 			stopC:              make(chan struct{}),
 			openThrottleFunc:   c.OpenThrottleFunc,
-			loosenThrottleFunc: c.BreaKThrottleFunc,
-			breakThrottleFunc:  c.LoosenThrottleFunc,
+			loosenThrottleFunc: c.LoosenThrottleFunc,
+			breakThrottleFunc:  c.BreaKThrottleFunc,
 		}
 		gHandler.stats.setConcurrency(concurrency)
 		gHandler.stats.setMaxInFlight(maxInFlight)

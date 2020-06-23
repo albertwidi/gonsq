@@ -80,7 +80,6 @@ func TestThrottleMiddleware(t *testing.T) {
 	)
 
 	wc.Handle(topic, channel, func(ctx context.Context, message *gonsq.Message) error {
-		t.Log("IN HANDLE")
 		testpublishedMessageCount := atomic.AddInt32(&workerMessageCount, 1)
 
 		if string(message.Message.Body) != messageExpect {
@@ -183,7 +182,6 @@ func TestThrottleMiddleware(t *testing.T) {
 		publishedMessageCount++
 	}
 
-	t.Log("PUBLISHING")
 	for i := 1; i <= int(publishedMessageCount); i++ {
 		err = <-errChan
 		if err != errNil {
@@ -193,7 +191,6 @@ func TestThrottleMiddleware(t *testing.T) {
 	}
 	close(errChan)
 
-	t.Log("GOING HERE")
 	if err := wc.Stop(context.Background()); err != nil {
 		t.Error(err)
 		return

@@ -30,6 +30,8 @@ type ConsumerClient interface {
 // the incoming messages. The ConsumerManager also manage the lifecycle of the
 // nsq consumers client and the concurrent handlers(start and stop).
 type ConsumerManager struct {
+	options *ConsumerManagerOptions
+
 	mu          sync.RWMutex
 	handlers    map[string]*gonsqHandler
 	middlewares []MiddlewareFunc
@@ -50,6 +52,49 @@ type ConsumerManager struct {
 	errC chan error
 }
 
+// ConsumerManagerOptions is a set of options for
+// consumer manager.
+type ConsumerManagerOptions struct {
+	OpenThrottleFunc   func(*Stats) bool
+	LoosenThrottleFunc func(*Stats) bool
+	BreakThrottleFunc  func(*Stats) bool
+}
+
+func (c *ConsumerManagerOptions) validate() error {
+	if c.OpenThrottleFunc == nil {
+		c.OpenThrottleFunc = defaultOpenThrottleFunc
+	}
+	if c.LoosenThrottleFunc == nil {
+		c.LoosenThrottleFunc = defaultLoosenThrottleFunc
+	}
+	if c.BreakThrottleFunc == nil {
+		c.BreakThrottleFunc = defaultBreakThrottleFunc
+	}
+	return nil
+}
+
+// NewConsumerManager create a new manager for NSQs consumers.
+// The function takes options for managing the consumers.
+func NewConsumerManager(options *ConsumerManagerOptions) (*ConsumerManager, error) {
+	if options == nil {
+		options = &ConsumerManagerOptions{
+			OpenThrottleFunc:   defaultOpenThrottleFunc,
+			LoosenThrottleFunc: defaultLoosenThrottleFunc,
+			BreakThrottleFunc:  defaultBreakThrottleFunc,
+		}
+	}
+
+	if err := options.validate(); err != nil {
+		return nil, err
+	}
+
+	return &ConsumerManager{
+		options:  options,
+		handlers: make(map[string]*gonsqHandler),
+		errC:     make(chan error),
+	}, nil
+}
+
 // ManageConsumers creates a new ConsumerManager
 func ManageConsumers(clients ...ConsumerClient) (*ConsumerManager, error) {
 	c := ConsumerManager{
@@ -60,6 +105,11 @@ func ManageConsumers(clients ...ConsumerClient) (*ConsumerManager, error) {
 		LoosenThrottleFunc: defaultLoosenThrottleFunc,
 	}
 	return &c, c.AddConsumers(clients...)
+}
+
+// AddConsumer add consumer to ConsumerManager
+func (c *ConsumerManager) AddConsumer(topic, channel string, client ConsumerClient) error {
+
 }
 
 // AddConsumers add more consumers to the consumer object.
